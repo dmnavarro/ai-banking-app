@@ -643,11 +643,86 @@ footer {
 .btn-primary { background: var(--blue); color: #fff; }
 .btn-primary:hover { background: var(--blue2); }
 
+/* ── TABLET ── */
 @media (max-width: 820px) {
   .hero-grid, .main-grid { grid-template-columns: 1fr; }
   nav ul { display: none; }
   .chat-window { width: calc(100vw - 2rem); right: -1rem; }
   .settings-drawer { width: 100vw; }
+  .footer-links { display: none; }
+  footer { flex-direction: column; gap: .75rem; text-align: center; padding: 1.25rem 1.5rem; }
+}
+
+/* ── MOBILE ── */
+@media (max-width: 540px) {
+  /* Nav */
+  nav { padding: 0 1rem; height: 56px; }
+  .logo-word { font-size: 1.1rem; }
+
+  /* Page */
+  .page { padding: 1.25rem 1rem 5rem; }
+  .greeting h1 { font-size: 1.25rem; }
+
+  /* Balance card */
+  .balance-card { padding: 1.5rem 1.25rem 0; min-height: 180px; }
+  .bal-amount { font-size: 2.2rem; }
+  .bal-meta { gap: 1rem; }
+
+  /* Quick actions — horizontal scroll instead of wrap */
+  .actions-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: .5rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .actions-row::-webkit-scrollbar { display: none; }
+  .action-btn { flex-shrink: 0; }
+
+  /* Transactions */
+  .txn-item { padding: .85rem 1rem; }
+
+  /* Spending panel */
+  .spend-item { padding: .65rem 1rem; }
+
+  /* Chat bubble — stick to bottom-right but with less margin */
+  .chat-bubble { bottom: 1rem; right: 1rem; }
+
+  /* Chat window — full screen on mobile */
+  .chat-window {
+    position: fixed;
+    inset: 0;
+    bottom: 0;
+    right: 0;
+    width: 100vw;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+
+  /* Chat messages area — fills remaining space */
+  .chat-messages { max-height: none; flex: 1; }
+
+  /* Preset chips — horizontal scroll */
+  .preset-scroll {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-height: none;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .preset-scroll::-webkit-scrollbar { display: none; }
+  .preset-chip { flex-shrink: 0; }
+
+  /* Stat cards */
+  .stat-card { padding: .9rem 1rem; }
+
+  /* Card — maintain aspect ratio but full width */
+  .credit-card { max-width: 100%; }
+
+  /* Footer */
+  footer { padding: 1rem; }
+  .footer-copy { font-size: .68rem; }
 }
 </style>
 
