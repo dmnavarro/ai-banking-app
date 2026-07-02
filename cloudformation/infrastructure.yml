@@ -59,7 +59,7 @@ Resources:
           }
 
   # ---------------------------------------------------------------------------
-  # GitHub OIDC Provider
+  # GitHub OIDC Provider (conditional — skip if it already exists in account)
   # ---------------------------------------------------------------------------
   GitHubOIDCProvider:
     Type: AWS::IAM::OIDCProvider
@@ -89,7 +89,7 @@ Resources:
               StringEquals:
                 "token.actions.githubusercontent.com:aud": sts.amazonaws.com
               StringLike:
-                "token.actions.githubusercontent.com:sub": !Sub "repo/${GitHubOrg}/${GitHubRepo}:ref:refs/heads/main"
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:*"
       Policies:
         - PolicyName: trend-bank-github-actions-policy
           PolicyDocument:
