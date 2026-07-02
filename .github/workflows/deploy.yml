@@ -63,6 +63,18 @@ jobs:
             --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE'].ServiceArn" \
             --output text)
 
+          if [ -n "$SERVICE_ARN" ]; then
+            echo "Waiting for any in-progress operation to finish..."
+            for i in $(seq 1 40); do
+              STATUS=$(aws apprunner describe-service \
+                --service-arn "$SERVICE_ARN" \
+                --query "Service.Status" --output text)
+              echo "  [$i/40] Status: $STATUS"
+              if [ "$STATUS" != "OPERATION_IN_PROGRESS" ]; then break; fi
+              sleep 15
+            done
+          fi
+
           if [ -z "$SERVICE_ARN" ]; then
             echo "Creating new App Runner service: $APP_RUNNER_SERVICE"
             SERVICE_ARN=$(aws apprunner create-service \
