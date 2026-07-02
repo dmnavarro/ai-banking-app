@@ -153,20 +153,30 @@ jobs:
 
           if [ -z "$ALREADY_LINKED" ]; then
             echo "Associating custom domain: $CUSTOM_DOMAIN"
-            DOMAIN_RESULT=$(aws apprunner associate-custom-domain \
+            aws apprunner associate-custom-domain \
               --service-arn "$SERVICE_ARN" \
-              --domain-name "$CUSTOM_DOMAIN")
-
-            echo ""
-            echo "===== DNS RECORDS REQUIRED ====="
-            echo "Add these CNAMEs at your DNS provider (hawkins.global):"
-            echo ""
-            echo "1. Point your domain to App Runner:"
-            echo "   $CUSTOM_DOMAIN  →  CNAME  →  $URL"
-            echo ""
-            echo "2. Certificate validation records:"
-            echo "$DOMAIN_RESULT" | jq -r '.CustomDomain.CertificateValidationRecords[] | "   \(.Name)  →  CNAME  →  \(.Value)"'
-            echo "================================"
-          else
-            echo "Custom domain $CUSTOM_DOMAIN already associated."
+              --domain-name "$CUSTOM_DOMAIN" > /dev/null
           fi
+
+          echo ""
+          echo "===== DNS RECORDS REQUIRED ====="
+          echo "Add these CNAMEs at your DNS provider (hawkins.global):"
+          echo ""
+          echo "1. Point your domain to App Runner:"
+          echo "   $CUSTOM_DOMAIN  →  CNAME  →  $URL"
+          echo ""
+          echo "2. Certificate validation records (waiting for records to populate)..."
+          for i in $(seq 1 10); do
+            RECORDS=$(aws apprunner describe-custom-domains \
+              --service-arn "$SERVICE_ARN" \
+              --query "CustomDomains[?DomainName=='$CUSTOM_DOMAIN'].CertificateValidationRecords[]" \
+              --output json)
+            COUNT=$(echo "$RECORDS" | jq 'length')
+            if [ "$COUNT" -gt 0 ]; then
+              echo "$RECORDS" | jq -r '.[] | "   \(.Name)  →  CNAME  →  \(.Value)"'
+              break
+            fi
+            echo "   waiting... ($i/10)"
+            sleep 10
+          done
+          echo "================================"
