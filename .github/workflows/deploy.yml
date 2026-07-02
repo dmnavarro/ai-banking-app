@@ -23,27 +23,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Debug OIDC Token Claims
-        run: |
-          echo "=== GitHub Context ==="
-          echo "Actor: ${{ github.actor }}"
-          echo "Repo: ${{ github.repository }}"
-          echo "Ref: ${{ github.ref }}"
-          echo "Event: ${{ github.event_name }}"
-          echo ""
-          echo "=== Fetching OIDC Token ==="
-          OIDC_TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | jq -r '.value // empty')
-          if [ -z "$OIDC_TOKEN" ]; then
-            echo "ERROR: Could not fetch OIDC token — id-token permission may not be granted"
-            exit 1
-          fi
-          echo "Token obtained. Decoding claims..."
-          PAYLOAD=$(echo "$OIDC_TOKEN" | cut -d. -f2)
-          # Pad base64 if needed
-          PADDED="${PAYLOAD}$(printf '%0.s=' $((4 - ${#PAYLOAD} % 4)))"
-          echo "$PADDED" | base64 -d 2>/dev/null | jq '{sub, aud, iss, repository, repository_owner, ref, job_workflow_ref}'
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -107,10 +86,6 @@ jobs:
               --query "Service.ServiceArn" \
               --output text)
 
-            echo "Waiting for service to be running..."
-            aws apprunner wait service-running \
-              --service-arn "$SERVICE_ARN"
-
             if [ -n "$WAF_WEBACL_ARN" ]; then
               echo "Associating WAF Web ACL..."
               aws wafv2 associate-web-acl \
@@ -134,11 +109,21 @@ jobs:
                   \"AccessRoleArn\": \"$ACCESS_ROLE_ARN\"
                 }
               }"
-
-            echo "Waiting for service to be running..."
-            aws apprunner wait service-running \
-              --service-arn "$SERVICE_ARN"
           fi
+
+          echo "Waiting for service to be RUNNING..."
+          for i in $(seq 1 40); do
+            STATUS=$(aws apprunner describe-service \
+              --service-arn "$SERVICE_ARN" \
+              --query "Service.Status" --output text)
+            echo "  [$i/40] Status: $STATUS"
+            if [ "$STATUS" = "RUNNING" ]; then break; fi
+            if [ "$STATUS" = "CREATE_FAILED" ] || [ "$STATUS" = "UPDATE_FAILED" ]; then
+              echo "Service failed with status: $STATUS"
+              exit 1
+            fi
+            sleep 15
+          done
 
           URL=$(aws apprunner describe-service \
             --service-arn "$SERVICE_ARN" \
