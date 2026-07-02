@@ -1996,6 +1996,30 @@ function addSystemMsg(text) {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
+// Conversation history for multi-turn context (kept in memory per session)
+const chatHistory = [];
+
+async function callBedrock(message) {
+  try {
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, history: chatHistory }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || resp.statusText);
+    // Append turn to history for context continuity
+    chatHistory.push({ role: 'user', content: message });
+    chatHistory.push({ role: 'assistant', content: data.reply });
+    // Keep last 10 turns to avoid token bloat
+    if (chatHistory.length > 20) chatHistory.splice(0, 2);
+    return data.reply;
+  } catch (e) {
+    console.error('[Bedrock]', e.message);
+    return "I'm having trouble connecting right now. Please try again in a moment.";
+  }
+}
+
 async function sendMessage() {
   if (scanning) return;
   const input = document.getElementById('chatInput');
@@ -2028,6 +2052,7 @@ async function sendMessage() {
       addBlockedMsg(guardResult);
     } else {
       addTypingIndicator();
+<<<<<<< Updated upstream
       let reply;
       try {
         const chatResp = await fetch('/api/chat', {
@@ -2040,6 +2065,9 @@ async function sendMessage() {
       } catch {
         reply = getBankingReply(text);
       }
+=======
+      const reply = await callBedrock(text);
+>>>>>>> Stashed changes
       removeTypingIndicator();
       addBotMsg(reply, guardResult);
     }

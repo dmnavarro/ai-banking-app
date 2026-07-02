@@ -146,7 +146,11 @@ Resources:
                 Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/apprunner.amazonaws.com/AWSServiceRoleForAppRunner"
 
   # ---------------------------------------------------------------------------
+<<<<<<< Updated upstream
   # App Runner ECR Access Role (used by App Runner to pull images from ECR)
+=======
+  # App Runner ECR Access Role (build-time image pull)
+>>>>>>> Stashed changes
   # ---------------------------------------------------------------------------
   AppRunnerAccessRole:
     Type: AWS::IAM::Role
@@ -163,7 +167,11 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
 
   # ---------------------------------------------------------------------------
+<<<<<<< Updated upstream
   # App Runner Instance Role (used by the running container to call AWS APIs)
+=======
+  # App Runner Instance Role (runtime — grants Bedrock access to the container)
+>>>>>>> Stashed changes
   # ---------------------------------------------------------------------------
   AppRunnerInstanceRole:
     Type: AWS::IAM::Role
@@ -186,7 +194,14 @@ Resources:
                 Action:
                   - bedrock:InvokeModel
                   - bedrock:InvokeModelWithResponseStream
+<<<<<<< Updated upstream
                 Resource: "*"
+=======
+                Resource:
+                  - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-haiku*"
+                  - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-sonnet*"
+                  - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-haiku*"
+>>>>>>> Stashed changes
 
   # ---------------------------------------------------------------------------
   # WAF IP Set (only created when an IP restriction is specified)
@@ -255,7 +270,11 @@ Outputs:
     Description: IAM Role ARN for App Runner instance (Bedrock access)
     Value: !GetAtt AppRunnerInstanceRole.Arn
     Export:
+<<<<<<< Updated upstream
       Name: trend-bank-instance-role
+=======
+      Name: trend-bank-apprunner-instance-role
+>>>>>>> Stashed changes
 
   WAFWebACLArn:
     Description: WAF Web ACL ARN
