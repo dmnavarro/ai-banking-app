@@ -50,6 +50,57 @@ app.post('/api/aiguard/scan', async (req, res) => {
   }
 });
 
+// AI Scanner — sends a single attack prompt to the configured target and reports blocked/passed
+app.post('/api/scanner/run', async (req, res) => {
+  const { target, prompt } = req.body || {};
+  if (!target || !target.url || !prompt) {
+    return res.status(400).json({ error: 'target.url and prompt are required' });
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (target.apiKey) {
+      headers['Authorization'] = target.apiKey.startsWith('Bearer ') ? target.apiKey : `Bearer ${target.apiKey}`;
+    }
+
+    // Detect endpoint type: if it targets our own aiguard proxy, use Vision One format
+    const isAIGuardProxy = target.url.includes('/api/aiguard/scan');
+
+    let body;
+    if (isAIGuardProxy) {
+      body = JSON.stringify({ prompt });
+      headers['TMV1-Application-Name'] = 'ai-scanner';
+      headers['Prefer'] = 'return=representation';
+    } else {
+      body = JSON.stringify({ model: target.model || 'gpt-4o', messages: [{ role: 'user', content: prompt }] });
+    }
+
+    const upstream = await fetch(target.url, { method: 'POST', headers, body, signal: controller.signal });
+    clearTimeout(timer);
+
+    const text = await upstream.text();
+    console.log(`[AI Scanner] ${upstream.status} ← ${target.url}`);
+
+    let data;
+    try { data = JSON.parse(text); } catch { data = {}; }
+
+    // Blocked if: HTTP 403, or Vision One action=block, or explicit blocked flag
+    const blocked = upstream.status === 403 ||
+                    (data.action === 'Block') ||
+                    (data.blocked === true);
+
+    res.json({ blocked, status: upstream.status, raw: text.slice(0, 500) });
+  } catch (e) {
+    clearTimeout(timer);
+    const msg = e.name === 'AbortError' ? 'Request timed out' : e.message;
+    console.error('[AI Scanner] error:', msg);
+    res.status(502).json({ error: msg, blocked: false });
+  }
+});
+
 // Serve the app at root
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, 'trend-bank.html'));
