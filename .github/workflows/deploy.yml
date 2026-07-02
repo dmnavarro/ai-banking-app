@@ -65,6 +65,7 @@ jobs:
         env:
           IMAGE_URI: ${{ steps.build-image.outputs.image }}
           ACCESS_ROLE_ARN: ${{ secrets.APP_RUNNER_ACCESS_ROLE_ARN }}
+          INSTANCE_ROLE_ARN: ${{ secrets.APP_RUNNER_INSTANCE_ROLE_ARN }}
           WAF_WEBACL_ARN: ${{ secrets.WAF_WEBACL_ARN }}
         run: |
           SERVICE_ARN=$(aws apprunner list-services \
@@ -101,7 +102,8 @@ jobs:
               }" \
               --instance-configuration "{
                 \"Cpu\": \"0.25 vCPU\",
-                \"Memory\": \"0.5 GB\"
+                \"Memory\": \"0.5 GB\",
+                \"InstanceRoleArn\": \"$INSTANCE_ROLE_ARN\"
               }" \
               --query "Service.ServiceArn" \
               --output text)
@@ -128,6 +130,11 @@ jobs:
                 \"AuthenticationConfiguration\": {
                   \"AccessRoleArn\": \"$ACCESS_ROLE_ARN\"
                 }
+              }" \
+              --instance-configuration "{
+                \"Cpu\": \"0.25 vCPU\",
+                \"Memory\": \"0.5 GB\",
+                \"InstanceRoleArn\": \"$INSTANCE_ROLE_ARN\"
               }"
           fi
 

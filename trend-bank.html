@@ -2028,9 +2028,20 @@ async function sendMessage() {
       addBlockedMsg(guardResult);
     } else {
       addTypingIndicator();
-      await new Promise(r => setTimeout(r, 700 + Math.random()*600));
+      let reply;
+      try {
+        const chatResp = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text }),
+        });
+        const chatData = await chatResp.json();
+        reply = chatData.reply || getBankingReply(text);
+      } catch {
+        reply = getBankingReply(text);
+      }
       removeTypingIndicator();
-      addBotMsg(getBankingReply(text), guardResult);
+      addBotMsg(reply, guardResult);
     }
   } finally {
     removeScanningIndicator();
