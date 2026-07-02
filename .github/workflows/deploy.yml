@@ -14,6 +14,7 @@ env:
   ECR_REPOSITORY: trend-bank
   APP_RUNNER_SERVICE: trend-bank
   APP_RUNNER_PORT: "3000"
+  CUSTOM_DOMAIN: bank.hawkins.global
 
 jobs:
   deploy:
@@ -143,3 +144,29 @@ jobs:
             --output text)
 
           echo "Deployed to: https://$URL"
+
+          # Associate custom domain if not already linked
+          ALREADY_LINKED=$(aws apprunner describe-custom-domains \
+            --service-arn "$SERVICE_ARN" \
+            --query "CustomDomains[?DomainName=='$CUSTOM_DOMAIN'].DomainName" \
+            --output text)
+
+          if [ -z "$ALREADY_LINKED" ]; then
+            echo "Associating custom domain: $CUSTOM_DOMAIN"
+            DOMAIN_RESULT=$(aws apprunner associate-custom-domain \
+              --service-arn "$SERVICE_ARN" \
+              --domain-name "$CUSTOM_DOMAIN")
+
+            echo ""
+            echo "===== DNS RECORDS REQUIRED ====="
+            echo "Add these CNAMEs at your DNS provider (hawkins.global):"
+            echo ""
+            echo "1. Point your domain to App Runner:"
+            echo "   $CUSTOM_DOMAIN  →  CNAME  →  $URL"
+            echo ""
+            echo "2. Certificate validation records:"
+            echo "$DOMAIN_RESULT" | jq -r '.CustomDomain.CertificateValidationRecords[] | "   \(.Name)  →  CNAME  →  \(.Value)"'
+            echo "================================"
+          else
+            echo "Custom domain $CUSTOM_DOMAIN already associated."
+          fi

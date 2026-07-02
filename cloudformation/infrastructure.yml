@@ -121,6 +121,8 @@ Resources:
                   - apprunner:UpdateService
                   - apprunner:DescribeService
                   - apprunner:StartDeployment
+                  - apprunner:AssociateCustomDomain
+                  - apprunner:DescribeCustomDomains
                 Resource: "*"
 
               - Sid: WAFAssociate
@@ -134,6 +136,12 @@ Resources:
                 Action:
                   - iam:PassRole
                 Resource: !GetAtt AppRunnerAccessRole.Arn
+
+              - Sid: AppRunnerServiceLinkedRole
+                Effect: Allow
+                Action:
+                  - iam:CreateServiceLinkedRole
+                Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/apprunner.amazonaws.com/AWSServiceRoleForAppRunner"
 
   # ---------------------------------------------------------------------------
   # App Runner ECR Access Role
@@ -153,10 +161,11 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
 
   # ---------------------------------------------------------------------------
-  # WAF IP Set
+  # WAF IP Set (only created when an IP restriction is specified)
   # ---------------------------------------------------------------------------
   WAFIPSet:
     Type: AWS::WAFv2::IPSet
+    Condition: RestrictIP
     Properties:
       Name: trend-bank-allowed-ips
       Scope: REGIONAL
