@@ -1,0 +1,12 @@
+{
+  "name": "trend-bank",
+  "version": "1.0.0",
+  "description": "Trend Bank demo with Vision One AI Guard integration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

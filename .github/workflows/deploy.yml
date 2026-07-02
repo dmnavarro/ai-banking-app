@@ -1,0 +1,126 @@
+name: Build and Deploy to AWS App Runner
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-southeast-1
+  ECR_REPOSITORY: trend-bank
+  APP_RUNNER_SERVICE: trend-bank
+  APP_RUNNER_PORT: "3000"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
+          IMAGE_URI_LATEST="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+
+          docker build -t "$IMAGE_URI" -t "$IMAGE_URI_LATEST" .
+          docker push "$IMAGE_URI"
+          docker push "$IMAGE_URI_LATEST"
+
+          echo "image=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+      - name: Code Security Scan
+        run: |
+          # TODO: Integrate Trend Vision One code security scan here
+          echo "Skipping security scan — integration pending"
+
+      - name: Deploy to App Runner
+        env:
+          IMAGE_URI: ${{ steps.build-image.outputs.image }}
+          ACCESS_ROLE_ARN: ${{ secrets.APP_RUNNER_ACCESS_ROLE_ARN }}
+          WAF_WEBACL_ARN: ${{ secrets.WAF_WEBACL_ARN }}
+        run: |
+          SERVICE_ARN=$(aws apprunner list-services \
+            --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE'].ServiceArn" \
+            --output text)
+
+          if [ -z "$SERVICE_ARN" ]; then
+            echo "Creating new App Runner service: $APP_RUNNER_SERVICE"
+            SERVICE_ARN=$(aws apprunner create-service \
+              --service-name "$APP_RUNNER_SERVICE" \
+              --source-configuration "{
+                \"ImageRepository\": {
+                  \"ImageIdentifier\": \"$IMAGE_URI\",
+                  \"ImageRepositoryType\": \"ECR\",
+                  \"ImageConfiguration\": {
+                    \"Port\": \"$APP_RUNNER_PORT\"
+                  }
+                },
+                \"AuthenticationConfiguration\": {
+                  \"AccessRoleArn\": \"$ACCESS_ROLE_ARN\"
+                }
+              }" \
+              --instance-configuration "{
+                \"Cpu\": \"0.25 vCPU\",
+                \"Memory\": \"0.5 GB\"
+              }" \
+              --query "Service.ServiceArn" \
+              --output text)
+
+            echo "Waiting for service to be running..."
+            aws apprunner wait service-running \
+              --service-arn "$SERVICE_ARN"
+
+            if [ -n "$WAF_WEBACL_ARN" ]; then
+              echo "Associating WAF Web ACL..."
+              aws wafv2 associate-web-acl \
+                --web-acl-arn "$WAF_WEBACL_ARN" \
+                --resource-arn "$SERVICE_ARN" \
+                --region "$AWS_REGION"
+            fi
+          else
+            echo "Updating existing App Runner service: $SERVICE_ARN"
+            aws apprunner update-service \
+              --service-arn "$SERVICE_ARN" \
+              --source-configuration "{
+                \"ImageRepository\": {
+                  \"ImageIdentifier\": \"$IMAGE_URI\",
+                  \"ImageRepositoryType\": \"ECR\",
+                  \"ImageConfiguration\": {
+                    \"Port\": \"$APP_RUNNER_PORT\"
+                  }
+                },
+                \"AuthenticationConfiguration\": {
+                  \"AccessRoleArn\": \"$ACCESS_ROLE_ARN\"
+                }
+              }"
+
+            echo "Waiting for service to be running..."
+            aws apprunner wait service-running \
+              --service-arn "$SERVICE_ARN"
+          fi
+
+          URL=$(aws apprunner describe-service \
+            --service-arn "$SERVICE_ARN" \
+            --query "Service.ServiceUrl" \
+            --output text)
+
+          echo "Deployed to: https://$URL"

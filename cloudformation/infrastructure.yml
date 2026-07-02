@@ -1,0 +1,225 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Trend Bank infrastructure — ECR, IAM (OIDC + roles), and WAF
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Description: Your GitHub username or organization name
+
+  GitHubRepo:
+    Type: String
+    Default: ai-banking-app
+    Description: GitHub repository name
+
+  AllowedIP:
+    Type: String
+    Default: "0.0.0.0/0"
+    Description: "Your public IP in CIDR format e.g. 1.2.3.4/32. Run: curl ifconfig.me"
+
+  CreateOIDCProvider:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+    Description: Set false if token.actions.githubusercontent.com OIDC provider already exists in this AWS account
+
+Conditions:
+  ShouldCreateOIDC: !Equals [!Ref CreateOIDCProvider, "true"]
+  RestrictIP: !Not [!Equals [!Ref AllowedIP, "0.0.0.0/0"]]
+
+Resources:
+
+  # ---------------------------------------------------------------------------
+  # ECR Repository
+  # ---------------------------------------------------------------------------
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: trend-bank
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep only last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  # ---------------------------------------------------------------------------
+  # GitHub OIDC Provider
+  # ---------------------------------------------------------------------------
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateOIDC
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - "6938fd4d98bab03faadb97b34396831e3780aea1"
+
+  # ---------------------------------------------------------------------------
+  # GitHub Actions IAM Role
+  # ---------------------------------------------------------------------------
+  GitHubActionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: trend-bank-github-actions-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "token.actions.githubusercontent.com:aud": sts.amazonaws.com
+              StringLike:
+                "token.actions.githubusercontent.com:sub": !Sub "repo/${GitHubOrg}/${GitHubRepo}:ref:refs/heads/main"
+      Policies:
+        - PolicyName: trend-bank-github-actions-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ECRAuth
+                Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: "*"
+
+              - Sid: ECRPush
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                Resource: !GetAtt ECRRepository.Arn
+
+              - Sid: AppRunner
+                Effect: Allow
+                Action:
+                  - apprunner:ListServices
+                  - apprunner:CreateService
+                  - apprunner:UpdateService
+                  - apprunner:DescribeService
+                  - apprunner:StartDeployment
+                Resource: "*"
+
+              - Sid: WAFAssociate
+                Effect: Allow
+                Action:
+                  - wafv2:AssociateWebACL
+                Resource: "*"
+
+              - Sid: PassAppRunnerRole
+                Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: !GetAtt AppRunnerAccessRole.Arn
+
+  # ---------------------------------------------------------------------------
+  # App Runner ECR Access Role
+  # ---------------------------------------------------------------------------
+  AppRunnerAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: trend-bank-apprunner-access-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: build.apprunner.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
+
+  # ---------------------------------------------------------------------------
+  # WAF IP Set
+  # ---------------------------------------------------------------------------
+  WAFIPSet:
+    Type: AWS::WAFv2::IPSet
+    Properties:
+      Name: trend-bank-allowed-ips
+      Scope: REGIONAL
+      IPAddressVersion: IPV4
+      Addresses:
+        - !Ref AllowedIP
+
+  # ---------------------------------------------------------------------------
+  # WAF Web ACL
+  # ---------------------------------------------------------------------------
+  WAFWebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: trend-bank-waf
+      Scope: REGIONAL
+      DefaultAction:
+        !If
+          - RestrictIP
+          - Block: {}
+          - Allow: {}
+      Rules:
+        !If
+          - RestrictIP
+          - - Name: AllowFromMyIP
+              Priority: 0
+              Action:
+                Allow: {}
+              Statement:
+                IPSetReferenceStatement:
+                  Arn: !GetAtt WAFIPSet.Arn
+              VisibilityConfig:
+                CloudWatchMetricsEnabled: true
+                MetricName: trend-bank-allow-my-ip
+                SampledRequestsEnabled: true
+          - []
+      VisibilityConfig:
+        CloudWatchMetricsEnabled: true
+        MetricName: trend-bank-waf
+        SampledRequestsEnabled: true
+
+Outputs:
+  ECRRepositoryUri:
+    Description: ECR repository URI for the Trend Bank image
+    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/trend-bank"
+
+  GitHubActionsRoleArn:
+    Description: IAM Role ARN for GitHub Actions
+    Value: !GetAtt GitHubActionsRole.Arn
+    Export:
+      Name: trend-bank-github-role
+
+  AppRunnerAccessRoleArn:
+    Description: IAM Role ARN for App Runner ECR access
+    Value: !GetAtt AppRunnerAccessRole.Arn
+    Export:
+      Name: trend-bank-apprunner-role
+
+  WAFWebACLArn:
+    Description: WAF Web ACL ARN
+    Value: !GetAtt WAFWebACL.Arn
+    Export:
+      Name: trend-bank-waf-arn
+
+  DeployRegion:
+    Description: AWS region where the stack is deployed
+    Value: !Ref AWS::Region
