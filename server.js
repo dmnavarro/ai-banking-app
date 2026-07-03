@@ -217,7 +217,8 @@ app.post('/api/scanner/tmas', (req, res) => {
   const env  = { ...process.env, TMAS_API_KEY: apiKey };
   if (target.apiKey) env.TARGET_API_KEY = target.apiKey;
 
-  const args = ['aiscan', 'llm', '-c', configFile, '--output', `json=${jsonFile},markdown=${mdFile}`];
+  const tmasRegion = process.env.TMAS_REGION || 'ap-southeast-1';
+  const args = ['aiscan', 'llm', '-c', configFile, '--region', tmasRegion, '--output', `json=${jsonFile},markdown=${mdFile}`];
   const proc = spawn('tmas', args, { env });
 
   const cleanup = () => fs.rmSync(runDir, { recursive: true, force: true });
