@@ -163,7 +163,7 @@ function buildTmasConfig(target, objectives) {
     `    method: POST`,
     `    headers:`,
     `      Content-Type: application/json`,
-    ...(target.apiKey ? [`      Authorization: "Bearer {{api_key}}"`] : []),
+    ...(target.apiKey ? [`      Authorization: "${target.bearerPrefix === false ? '' : 'Bearer '}{{api_key}}"`] : []),
     `    request:`,
     ...(target.endpointType === 'custom' ? [
       `      message: "{{prompt}}"`,

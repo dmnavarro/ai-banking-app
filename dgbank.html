@@ -1283,6 +1283,10 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
         <div class="sc-field-group">
           <label>Target API Key <span class="sc-optional">(optional)</span></label>
           <input type="password" class="sc-input" id="scTargetApiKey" placeholder="Bearer token or API key">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-top:.4rem">
+            <input type="checkbox" id="scBearerPrefix" checked style="width:auto;accent-color:var(--navy)">
+            <label for="scBearerPrefix" style="font-size:.8rem;color:var(--muted);margin:0">Prefix with <code>Bearer</code></label>
+          </div>
         </div>
         <div class="sc-field-group" id="scModelField">
           <label>Target Model ID</label>
@@ -2493,7 +2497,7 @@ async function runLiveScan(active, targetLabel, targetUrl) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          target: { url: targetUrl, apiKey: apiKey || undefined, groupName, endpointType: endpointFormat, model: document.getElementById('scTargetModel').value },
+          target: { url: targetUrl, apiKey: apiKey || undefined, groupName, endpointType: endpointFormat, model: document.getElementById('scTargetModel').value, bearerPrefix: document.getElementById('scBearerPrefix').checked },
           objectives,
         }),
       });
