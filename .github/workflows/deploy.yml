@@ -63,6 +63,16 @@ jobs:
           tmasApiKey: ${{ secrets.TMAS_API_KEY }}
           githubToken: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Sync TMAS API key to SSM
+        if: ${{ env.TMAS_API_KEY != '' }}
+        run: |
+          aws ssm put-parameter \
+            --name "/dgbank/tmas-api-key" \
+            --value "$TMAS_API_KEY" \
+            --type SecureString \
+            --overwrite \
+            --region "$AWS_REGION"
+
       - name: Deploy to ECS
         run: |
           aws ecs update-service \

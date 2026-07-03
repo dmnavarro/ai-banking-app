@@ -42,6 +42,7 @@ Parameters:
     Default: ""
     Description: ACM certificate ARN for HTTPS. Leave empty for HTTP only.
 
+
 Conditions:
   ShouldCreateOIDC: !Equals [!Ref CreateOIDCProvider, "true"]
   HasCertificate: !Not [!Equals [!Ref CertificateArn, ""]]
@@ -192,6 +193,11 @@ Resources:
                 Resource:
                   - !GetAtt ECSExecutionRole.Arn
                   - !GetAtt ECSTaskRole.Arn
+              - Sid: SSMWriteSecrets
+                Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/*"
 
   # ---------------------------------------------------------------------------
   # IAM — ECS Task Execution Role (ECR pull + CloudWatch logs)
@@ -209,6 +215,16 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: dgbank-ai-app-demo-ssm-read
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameters
+                  - ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/*"
 
   # ---------------------------------------------------------------------------
   # IAM — ECS Task Role (runtime — Bedrock access)
@@ -339,6 +355,9 @@ Resources:
               Value: !Ref BedrockRegion
             - Name: BEDROCK_MODEL_ID
               Value: !Ref BedrockModelId
+          Secrets:
+            - Name: TMAS_API_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/tmas-api-key"
           LogConfiguration:
             LogDriver: awslogs
             Options:

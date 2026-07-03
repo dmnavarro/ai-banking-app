@@ -1259,8 +1259,8 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
           <input type="text" class="sc-input" id="scTargetLabel" placeholder="e.g. DG Bank Chatbot" value="DG Bank Chatbot">
         </div>
         <div class="sc-field-group">
-          <label>OpenAI API Endpoint <span class="sc-optional">— must implement OpenAI v1 API Spec</span></label>
-          <input type="url" class="sc-input" id="scTargetUrl" placeholder="https://your-endpoint/v1/" value="http://localhost:3000/api/aiguard/scan">
+          <label>Target Chat Endpoint <span class="sc-optional">— chatbot endpoint (TMAS sends custom JSON format)</span></label>
+          <input type="url" class="sc-input" id="scTargetUrl" placeholder="https://your-chatbot/api/chat" value="http://localhost:3000/api/chat">
         </div>
         <div class="sc-field-group">
           <label>Target API Key <span class="sc-optional">(optional)</span></label>
@@ -2415,18 +2415,76 @@ async function runDemoScan(active, targetLabel) {
   lastResults = { results, mode: 'demo', targetLabel };
 }
 
+// TMAS-supported objective name mapping
+const TMAS_OBJ_MAP = {
+  sensitive_data: 'Sensitive Data Disclosure',
+  system_prompt:  'System Prompt Leakage',
+  malicious_code: 'Malicious Code Generation',
+  tool_leakage:   'Agent Tool Definition Leakage',
+};
+
 async function runLiveScan(active, targetLabel, targetUrl) {
   const delay = ms => new Promise(r => setTimeout(r, ms));
-  const apiKey = document.getElementById('scTargetApiKey').value.trim();
+  const apiKey    = document.getElementById('scTargetApiKey').value.trim();
+  const groupName = document.getElementById('scGroupName').value.trim() || 'dgbank-chatbot';
 
-  addLogLine(`[${nowTimestamp()}] Connecting to ${targetUrl}...`, 'dim');
-  await delay(300);
+  // Map chip selections to TMAS names
+  const selectedTechNames = [...selectedTechniques]
+    .map(id => TECHNIQUES.find(t => t.id === id)?.name).filter(Boolean);
+  const selectedModNames  = [...selectedModifiers]
+    .map(id => MODIFIERS.find(m => m.id === id)?.name).filter(Boolean);
+
+  // Partition: TMAS-supported vs custom-prompt only
+  const tmasActive   = active.filter(o => TMAS_OBJ_MAP[o.id]);
+  const customActive = active.filter(o => !TMAS_OBJ_MAP[o.id]);
+
   addLogLine(`[${nowTimestamp()}] Target: ${targetLabel}`, 'white');
   await delay(200);
 
   const results = [];
 
-  for (const obj of active) {
+  // --- TMAS batch scan (4 supported objectives) ---
+  if (tmasActive.length > 0) {
+    const techLabel = selectedTechNames.length ? selectedTechNames.join(', ') : 'None';
+    const modLabel  = selectedModNames.length  ? selectedModNames.join(', ')  : 'None';
+    addLogLine(`[${nowTimestamp()}] TMAS: ${tmasActive.length} objective(s) | techniques: ${techLabel} | modifiers: ${modLabel}`, 'dim');
+    await delay(300);
+
+    const objectives = tmasActive.map(o => ({
+      name:       TMAS_OBJ_MAP[o.id],
+      techniques: selectedTechNames.length ? selectedTechNames : ['None'],
+      modifiers:  selectedModNames.length  ? selectedModNames  : ['None'],
+    }));
+
+    try {
+      addLogLine(`[${nowTimestamp()}] Launching TMAS aiscan llm...`, 'dim');
+      const resp = await fetch('/api/scanner/tmas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target: { url: targetUrl, apiKey: apiKey || undefined, groupName },
+          objectives,
+        }),
+      });
+
+      const raw = await resp.json();
+      console.log('[TMAS raw results]', JSON.stringify(raw, null, 2));
+
+      if (!resp.ok) throw new Error(raw.error || `HTTP ${resp.status}`);
+
+      addLogLine(`[${nowTimestamp()}] TMAS scan complete`, 'green');
+      results.push(...parseTmasResults(tmasActive, raw));
+    } catch (e) {
+      addLogLine(`[${nowTimestamp()}] TMAS error: ${e.message}`, 'red');
+      for (const obj of tmasActive) {
+        results.push({ id: obj.id, name: obj.name, status: 'failed', score: '0/0',
+          techniques: [{ name: 'TMAS error', status: 'passed', note: e.message }] });
+      }
+    }
+  }
+
+  // --- Custom prompt scan for non-TMAS objectives (model_discovery, hallucination) ---
+  for (const obj of customActive) {
     addLogLine(`[${nowTimestamp()}] Running: ${obj.name} (${obj.techniques.length} technique${obj.techniques.length !== 1 ? 's' : ''})`, 'white');
     await delay(200);
 
@@ -2441,7 +2499,8 @@ async function runLiveScan(active, targetLabel, targetUrl) {
         });
         const data = await resp.json();
         const blocked = data.blocked === true;
-        techniques.push({ name: tech.name, status: blocked ? 'blocked' : 'passed', note: blocked ? 'Blocked by AI Guard' : (data.reason || 'Endpoint responded to attack prompt') });
+        techniques.push({ name: tech.name, status: blocked ? 'blocked' : 'passed',
+          note: blocked ? 'Blocked by AI Guard' : (data.reason || 'Endpoint responded to attack prompt') });
         addLogLine(`[${nowTimestamp()}]   ${blocked ? '✓' : '⚠'} Technique ${i+1}: ${blocked ? 'Blocked' : 'Passed'}`, blocked ? 'green' : 'amber');
       } catch (e) {
         techniques.push({ name: tech.name, status: 'passed', note: `Error: ${e.message}` });
@@ -2452,11 +2511,71 @@ async function runLiveScan(active, targetLabel, targetUrl) {
 
     const blocked = techniques.filter(t => t.status === 'blocked').length;
     const total   = techniques.length;
-    const status  = blocked === total ? 'blocked' : blocked === 0 ? 'failed' : 'partial';
-    results.push({ id: obj.id, name: obj.name, status, score: `${blocked}/${total}`, techniques });
+    results.push({ id: obj.id, name: obj.name,
+      status: blocked === total ? 'blocked' : blocked === 0 ? 'failed' : 'partial',
+      score: `${blocked}/${total}`, techniques });
   }
 
   lastResults = { results, mode: 'live', targetLabel };
+}
+
+// Parse TMAS results.json → frontend results shape.
+// TMAS structure: flat evaluation_results[] where each entry has:
+//   attack_objective, attack_technique[], modifier[], attack_outcome
+// "Attack Failed"   = the attack was blocked (good, guard worked)
+// "Attack Succeeded"= the attack got through (vulnerability)
+function parseTmasResults(activeObjs, tmasData) {
+  const results    = [];
+  const evalItems  = tmasData.evaluation_results || [];
+
+  // Group flat items by attack_objective name
+  const byObjective = {};
+  for (const item of evalItems) {
+    const key = item.attack_objective || '';
+    if (!byObjective[key]) byObjective[key] = [];
+    byObjective[key].push(item);
+  }
+
+  for (const obj of activeObjs) {
+    const tmasName = TMAS_OBJ_MAP[obj.id];
+    const items    = byObjective[tmasName] || [];
+
+    if (!items.length) {
+      results.push({ id: obj.id, name: obj.name, status: 'failed', score: '0/0', techniques: [] });
+      continue;
+    }
+
+    // Group by technique+modifier label, count blocked vs total
+    const techMap = {};
+    for (const item of items) {
+      const techPart = (item.attack_technique || []).join(' + ') || 'None';
+      const modPart  = (item.modifier || []).filter(m => m !== 'None').join(' + ');
+      const label    = modPart ? `${techPart} + ${modPart}` : techPart;
+      if (!techMap[label]) techMap[label] = { total: 0, blocked: 0 };
+      techMap[label].total++;
+      if ((item.attack_outcome || '').toLowerCase().includes('failed')) {
+        techMap[label].blocked++;
+      }
+    }
+
+    const techniques = Object.entries(techMap).map(([name, { total, blocked }]) => ({
+      name,
+      status: blocked === total ? 'blocked' : 'passed',
+      note:   blocked === total
+        ? `All ${total} attack prompt${total !== 1 ? 's' : ''} blocked`
+        : `${blocked}/${total} attack prompts blocked`,
+    }));
+
+    const blocked = techniques.filter(t => t.status === 'blocked').length;
+    const total   = techniques.length;
+    results.push({
+      id: obj.id, name: obj.name,
+      status: blocked === total ? 'blocked' : blocked === 0 ? 'failed' : 'partial',
+      score:  `${blocked}/${total}`, techniques,
+    });
+  }
+
+  return results;
 }
 
 function renderResults(data) {

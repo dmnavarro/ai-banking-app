@@ -140,6 +140,96 @@ app.post('/api/scanner/run', async (req, res) => {
   }
 });
 
+// AI Scanner — TMAS live mode: writes config, runs tmas aiscan llm, returns results.json
+app.post('/api/scanner/tmas', async (req, res) => {
+  const { target, objectives } = req.body || {};
+  if (!target || !target.url) return res.status(400).json({ error: 'target.url is required' });
+
+  const apiKey = process.env.TMAS_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'TMAS_API_KEY not configured on this server' });
+
+  const fs      = require('fs');
+  const os      = require('os');
+  const { spawn } = require('child_process');
+
+  // Write a temp config.yaml for this scan
+  const runDir     = fs.mkdtempSync(path.join(os.tmpdir(), 'tmas-'));
+  const configFile = path.join(runDir, 'config.yaml');
+  const jsonFile   = path.join(runDir, 'results.json');
+  const mdFile     = path.join(runDir, 'report.md');
+
+  const attackObjectives = (objectives || []).map(obj => ({
+    name: obj.name,
+    techniques: obj.techniques || ['None'],
+    modifiers:  obj.modifiers  || ['None'],
+  }));
+
+  const config = [
+    `version: 1.1.0`,
+    `name: DG Bank AI Chatbot Security Scan`,
+    `description: Live security scan against ${target.url}`,
+    `target:`,
+    `  name: ${target.groupName || 'dgbank-chatbot'}`,
+    `  endpoint: ${target.url}`,
+    ...(target.apiKey ? [`  api_key_env: TARGET_API_KEY`] : []),
+    `  custom:`,
+    `    method: POST`,
+    `    headers:`,
+    `      Content-Type: application/json`,
+    ...(target.apiKey ? [`      Authorization: "Bearer {{api_key}}"`] : []),
+    `    request:`,
+    `      message: "{{prompt}}"`,
+    `      history: []`,
+    `    response:`,
+    `      reply: "{{response}}"`,
+    `settings:`,
+    `  concurrency: 5`,
+    `attack_objectives:`,
+    ...attackObjectives.flatMap(obj => [
+      `  - name: ${obj.name}`,
+      `    techniques:`,
+      ...obj.techniques.map(t => `      - ${t}`),
+      `    modifiers:`,
+      ...obj.modifiers.map(m => `      - ${m}`),
+    ]),
+  ].join('\n');
+
+  fs.writeFileSync(configFile, config);
+  console.log(`[TMAS] config written to ${configFile}`);
+
+  const env = { ...process.env, TMAS_API_KEY: apiKey };
+  if (target.apiKey) env.TARGET_API_KEY = target.apiKey;
+
+  const args = ['aiscan', 'llm', '-c', configFile, `--output`, `json=${jsonFile},markdown=${mdFile}`];
+  console.log(`[TMAS] tmas ${args.join(' ')}`);
+
+  const proc = spawn('tmas', args, { env });
+
+  let stderr = '';
+  proc.stderr.on('data', d => { stderr += d; process.stdout.write(`[TMAS] ${d}`); });
+
+  proc.on('close', code => {
+    console.log(`[TMAS] exit ${code}`);
+    try {
+      if (code !== 0) {
+        return res.status(502).json({ error: stderr || `tmas exited with code ${code}` });
+      }
+      const results = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
+      res.json(results);
+    } catch (e) {
+      res.status(502).json({ error: e.message, stderr });
+    } finally {
+      fs.rmSync(runDir, { recursive: true, force: true });
+    }
+  });
+
+  proc.on('error', e => {
+    console.error('[TMAS] spawn error:', e.message);
+    fs.rmSync(runDir, { recursive: true, force: true });
+    res.status(502).json({ error: e.message });
+  });
+});
+
 // Serve the app at root
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, 'dgbank.html'));
