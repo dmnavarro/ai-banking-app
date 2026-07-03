@@ -219,6 +219,12 @@ app.post('/api/scanner/tmas', (req, res) => {
   const apiKey = (process.env.TMAS_API_KEY || '').trim();
   if (!apiKey) return res.status(503).json({ error: 'TMAS_API_KEY not configured on this server' });
 
+  try {
+    require('child_process').execSync('which tmas', { stdio: 'ignore' });
+  } catch {
+    return res.status(503).json({ error: 'tmas CLI not found on this server — ensure it is installed and on PATH.' });
+  }
+
   const jobId  = randomUUID();
   const job    = { emitter: new EventEmitter(), done: false, results: null, error: null, log: [] };
   tmasJobs.set(jobId, job);
