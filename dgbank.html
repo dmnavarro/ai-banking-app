@@ -2457,8 +2457,8 @@ async function runLiveScan(active, targetLabel, targetUrl) {
     }));
 
     try {
-      addLogLine(`[${nowTimestamp()}] Launching TMAS aiscan llm...`, 'dim');
-      const resp = await fetch('/api/scanner/tmas', {
+      addLogLine(`[${nowTimestamp()}] Starting TMAS scan job...`, 'dim');
+      const startResp = await fetch('/api/scanner/tmas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2466,12 +2466,30 @@ async function runLiveScan(active, targetLabel, targetUrl) {
           objectives,
         }),
       });
+      const { jobId, error: startErr } = await startResp.json();
+      if (!startResp.ok) throw new Error(startErr || `HTTP ${startResp.status}`);
 
-      const raw = await resp.json();
+      addLogLine(`[${nowTimestamp()}] Job started — streaming progress...`, 'dim');
+
+      const raw = await new Promise((resolve, reject) => {
+        const es = new EventSource(`/api/scanner/tmas/events/${jobId}`);
+        const LEVELS = { dim: 'dim', white: 'white', green: 'green', red: 'red', amber: 'amber' };
+        es.onmessage = e => {
+          const ev = JSON.parse(e.data);
+          if (ev.type === 'log') {
+            addLogLine(`[${nowTimestamp()}] ${ev.message}`, LEVELS[ev.level] || 'dim');
+          } else if (ev.type === 'done') {
+            es.close();
+            resolve(ev.results);
+          } else if (ev.type === 'error') {
+            es.close();
+            reject(new Error(ev.message));
+          }
+        };
+        es.onerror = () => { es.close(); reject(new Error('SSE connection lost')); };
+      });
+
       console.log('[TMAS raw results]', JSON.stringify(raw, null, 2));
-
-      if (!resp.ok) throw new Error(raw.error || `HTTP ${resp.status}`);
-
       addLogLine(`[${nowTimestamp()}] TMAS scan complete`, 'green');
       results.push(...parseTmasResults(tmasActive, raw));
     } catch (e) {

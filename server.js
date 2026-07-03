@@ -140,31 +140,18 @@ app.post('/api/scanner/run', async (req, res) => {
   }
 });
 
-// AI Scanner — TMAS live mode: writes config, runs tmas aiscan llm, returns results.json
-app.post('/api/scanner/tmas', async (req, res) => {
-  const { target, objectives } = req.body || {};
-  if (!target || !target.url) return res.status(400).json({ error: 'target.url is required' });
+// AI Scanner — TMAS live mode with SSE streaming
+const { EventEmitter } = require('events');
+const { randomUUID }   = require('crypto');
+const tmasJobs = new Map(); // jobId → { emitter, done, results, error, log[] }
 
-  const apiKey = process.env.TMAS_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: 'TMAS_API_KEY not configured on this server' });
-
-  const fs      = require('fs');
-  const os      = require('os');
-  const { spawn } = require('child_process');
-
-  // Write a temp config.yaml for this scan
-  const runDir     = fs.mkdtempSync(path.join(os.tmpdir(), 'tmas-'));
-  const configFile = path.join(runDir, 'config.yaml');
-  const jsonFile   = path.join(runDir, 'results.json');
-  const mdFile     = path.join(runDir, 'report.md');
-
+function buildTmasConfig(target, objectives) {
   const attackObjectives = (objectives || []).map(obj => ({
-    name: obj.name,
+    name:       obj.name,
     techniques: obj.techniques || ['None'],
     modifiers:  obj.modifiers  || ['None'],
   }));
-
-  const config = [
+  return [
     `version: 1.1.0`,
     `name: DG Bank AI Chatbot Security Scan`,
     `description: Live security scan against ${target.url}`,
@@ -193,40 +180,113 @@ app.post('/api/scanner/tmas', async (req, res) => {
       ...obj.modifiers.map(m => `      - ${m}`),
     ]),
   ].join('\n');
+}
 
-  fs.writeFileSync(configFile, config);
-  console.log(`[TMAS] config written to ${configFile}`);
+// Start a TMAS scan — returns jobId immediately
+app.post('/api/scanner/tmas', (req, res) => {
+  const { target, objectives } = req.body || {};
+  if (!target || !target.url) return res.status(400).json({ error: 'target.url is required' });
 
-  const env = { ...process.env, TMAS_API_KEY: apiKey };
+  const apiKey = process.env.TMAS_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'TMAS_API_KEY not configured on this server' });
+
+  const jobId  = randomUUID();
+  const job    = { emitter: new EventEmitter(), done: false, results: null, error: null, log: [] };
+  tmasJobs.set(jobId, job);
+  res.json({ jobId });
+
+  // Run asynchronously
+  const fs           = require('fs');
+  const os           = require('os');
+  const { spawn }    = require('child_process');
+  const runDir       = fs.mkdtempSync(path.join(os.tmpdir(), 'tmas-'));
+  const configFile   = path.join(runDir, 'config.yaml');
+  const jsonFile     = path.join(runDir, 'results.json');
+  const mdFile       = path.join(runDir, 'report.md');
+
+  const emit = (type, payload) => {
+    const ev = { type, ...payload };
+    job.log.push(ev);
+    job.emitter.emit('event', ev);
+  };
+
+  fs.writeFileSync(configFile, buildTmasConfig(target, objectives));
+  emit('log', { message: 'TMAS config written — launching scan...', level: 'dim' });
+  console.log(`[TMAS] job=${jobId} config=${configFile}`);
+
+  const env  = { ...process.env, TMAS_API_KEY: apiKey };
   if (target.apiKey) env.TARGET_API_KEY = target.apiKey;
 
-  const args = ['aiscan', 'llm', '-c', configFile, `--output`, `json=${jsonFile},markdown=${mdFile}`];
-  console.log(`[TMAS] tmas ${args.join(' ')}`);
-
+  const args = ['aiscan', 'llm', '-c', configFile, '--output', `json=${jsonFile},markdown=${mdFile}`];
   const proc = spawn('tmas', args, { env });
 
-  let stderr = '';
-  proc.stderr.on('data', d => { stderr += d; process.stdout.write(`[TMAS] ${d}`); });
+  const cleanup = () => fs.rmSync(runDir, { recursive: true, force: true });
+  const finalize = () => setTimeout(() => tmasJobs.delete(jobId), 10 * 60 * 1000);
+
+  proc.stderr.on('data', d => {
+    d.toString().split('\n').filter(Boolean).forEach(line => {
+      process.stdout.write(`[TMAS] ${line}\n`);
+      emit('log', { message: line, level: 'dim' });
+    });
+  });
 
   proc.on('close', code => {
-    console.log(`[TMAS] exit ${code}`);
+    console.log(`[TMAS] job=${jobId} exit=${code}`);
     try {
       if (code !== 0) {
-        return res.status(502).json({ error: stderr || `tmas exited with code ${code}` });
+        job.error = `tmas exited with code ${code}`;
+        emit('error', { message: job.error });
+      } else {
+        job.results = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
+        emit('done', { results: job.results });
       }
-      const results = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
-      res.json(results);
     } catch (e) {
-      res.status(502).json({ error: e.message, stderr });
+      job.error = e.message;
+      emit('error', { message: e.message });
     } finally {
-      fs.rmSync(runDir, { recursive: true, force: true });
+      job.done = true;
+      cleanup();
+      finalize();
     }
   });
 
   proc.on('error', e => {
     console.error('[TMAS] spawn error:', e.message);
-    fs.rmSync(runDir, { recursive: true, force: true });
-    res.status(502).json({ error: e.message });
+    job.error = e.message;
+    job.done  = true;
+    emit('error', { message: e.message });
+    cleanup();
+    finalize();
+  });
+});
+
+// SSE stream for a running TMAS job
+app.get('/api/scanner/tmas/events/:jobId', (req, res) => {
+  const job = tmasJobs.get(req.params.jobId);
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+
+  res.setHeader('Content-Type',  'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection',    'keep-alive');
+  res.flushHeaders();
+
+  const send = ev => res.write(`data: ${JSON.stringify(ev)}\n\n`);
+
+  // Replay buffered events for late-connecting clients
+  for (const ev of job.log) send(ev);
+
+  if (job.done) return res.end();
+
+  // Heartbeat every 25s to prevent ALB idle-timeout (default 60s)
+  const heartbeat = setInterval(() => res.write(': ping\n\n'), 25000);
+
+  job.emitter.on('event', send);
+  const onDone = () => { clearInterval(heartbeat); res.end(); };
+  job.emitter.once('event', ev => { if (ev.type === 'done' || ev.type === 'error') onDone(); });
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    job.emitter.off('event', send);
   });
 });
 
