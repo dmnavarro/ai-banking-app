@@ -165,10 +165,21 @@ function buildTmasConfig(target, objectives) {
     `      Content-Type: application/json`,
     ...(target.apiKey ? [`      Authorization: "Bearer {{api_key}}"`] : []),
     `    request:`,
-    `      message: "{{prompt}}"`,
-    `      history: []`,
+    ...(target.endpointType === 'custom' ? [
+      `      message: "{{prompt}}"`,
+      `      history: []`,
+    ] : [
+      `      model: "${target.model || 'claude-4-sonnet-aws'}"`,
+      `      messages:`,
+      `        - role: user`,
+      `          content: "{{prompt}}"`,
+    ]),
     `    response:`,
-    `      reply: "{{response}}"`,
+    ...(target.endpointType === 'custom' ? [
+      `      reply: "{{response}}"`,
+    ] : [
+      `      choices[0].message.content: "{{response}}"`,
+    ]),
     `settings:`,
     `  concurrency: 5`,
     `attack_objectives:`,

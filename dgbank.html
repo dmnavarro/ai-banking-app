@@ -1270,24 +1270,29 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
           <input type="text" class="sc-input" id="scTargetLabel" placeholder="e.g. DG Bank Chatbot" value="DG Bank Chatbot">
         </div>
         <div class="sc-field-group">
-          <label>Target Chat Endpoint <span class="sc-optional">— chatbot endpoint (TMAS sends custom JSON format)</span></label>
+          <label>Endpoint Format</label>
+          <div style="display:flex;gap:.5rem;margin-top:.25rem">
+            <button class="smode-btn" id="epFmtCustom" onclick="setEndpointFormat('custom')">Custom</button>
+            <button class="smode-btn active" id="epFmtOpenai" onclick="setEndpointFormat('openai')">OpenAI-compatible</button>
+          </div>
+        </div>
+        <div class="sc-field-group">
+          <label>Target Chat Endpoint <span class="sc-optional" id="scEndpointHint">— OpenAI-compatible chat completions URL</span></label>
           <input type="url" class="sc-input" id="scTargetUrl" placeholder="https://your-chatbot/api/chat" value="http://localhost:3000/api/chat">
         </div>
         <div class="sc-field-group">
           <label>Target API Key <span class="sc-optional">(optional)</span></label>
           <input type="password" class="sc-input" id="scTargetApiKey" placeholder="Bearer token or API key">
         </div>
-        <div class="sc-field-group">
+        <div class="sc-field-group" id="scModelField">
           <label>Target Model ID</label>
           <select class="sc-input" id="scTargetModel">
             <option value="claude-3-haiku">claude-3-haiku</option>
-            <option value="claude-3.5-haiku">claude-3.5-haiku</option>
-            <option value="claude-3.5-sonnet" selected>claude-3.5-sonnet</option>
-            <option value="claude-3.5-sonnet-v2">claude-3.5-sonnet-v2</option>
-            <option value="claude-3.7-sonnet">claude-3.7-sonnet</option>
-            <option value="claude-4-opus">claude-4-opus</option>
-            <option value="claude-4-opus-aws">claude-4-opus-aws</option>
-            <option value="claude-4-sonnet">claude-4-sonnet</option>
+            <option value="claude-4-sonnet-aws" selected>claude-4-sonnet-aws</option>
+            <option value="claude-4.5-sonnet-aws">claude-4.5-sonnet-aws</option>
+            <option value="claude-4.5-haiku-aws">claude-4.5-haiku-aws</option>
+            <option value="claude-4.1-opus-aws">claude-4.1-opus-aws</option>
+            <option value="claude-4.5-opus-aws">claude-4.5-opus-aws</option>
           </select>
         </div>
       </div>
@@ -2220,6 +2225,17 @@ function closeScannerPage() {
   document.getElementById('scannerPage').classList.remove('open');
 }
 
+let endpointFormat = 'openai';
+
+function setEndpointFormat(fmt) {
+  endpointFormat = fmt;
+  document.getElementById('epFmtCustom').classList.toggle('active', fmt === 'custom');
+  document.getElementById('epFmtOpenai').classList.toggle('active', fmt === 'openai');
+  document.getElementById('scModelField').style.display = fmt === 'openai' ? '' : 'none';
+  document.getElementById('scEndpointHint').textContent =
+    fmt === 'openai' ? '— OpenAI-compatible chat completions URL' : '— chatbot endpoint (TMAS sends {message, history} → expects {reply})';
+}
+
 function setScannerMode(mode) {
   scannerMode = mode;
   document.getElementById('sModeDemo').classList.toggle('active', mode === 'demo');
@@ -2477,7 +2493,7 @@ async function runLiveScan(active, targetLabel, targetUrl) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          target: { url: targetUrl, apiKey: apiKey || undefined, groupName },
+          target: { url: targetUrl, apiKey: apiKey || undefined, groupName, endpointType: endpointFormat, model: document.getElementById('scTargetModel').value },
           objectives,
         }),
       });
