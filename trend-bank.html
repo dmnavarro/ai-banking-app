@@ -2052,22 +2052,7 @@ async function sendMessage() {
       addBlockedMsg(guardResult);
     } else {
       addTypingIndicator();
-<<<<<<< Updated upstream
-      let reply;
-      try {
-        const chatResp = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text }),
-        });
-        const chatData = await chatResp.json();
-        reply = chatData.reply || getBankingReply(text);
-      } catch {
-        reply = getBankingReply(text);
-      }
-=======
       const reply = await callBedrock(text);
->>>>>>> Stashed changes
       removeTypingIndicator();
       addBotMsg(reply, guardResult);
     }
