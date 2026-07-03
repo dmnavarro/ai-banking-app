@@ -1703,18 +1703,20 @@ function refreshStatusCard() {
 }
 
 async function testConnection() {
-  const apiKey  = document.getElementById('apiKeyInput').value.trim();
-  const region  = document.getElementById('regionSelect').value;
-  const endpoint = document.getElementById('endpointInput').value.trim() || '/v3.0/aiSecurity/applyGuardrails';
+  const apiKey = document.getElementById('apiKeyInput').value.trim();
+  const region = document.getElementById('regionSelect').value;
   if (!apiKey) { alert('Please enter an API key first.'); return; }
   const btn = document.getElementById('testBtn');
   btn.textContent = 'Testing…'; btn.disabled = true;
   try {
-    const baseUrl = REGIONS[region] || REGIONS['us'];
-    const resp = await fetch(baseUrl + endpoint, {
+    const resp = await fetch('/api/aiguard/scan', {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: [{ role: 'user', content: 'ping' }] })
+      headers: {
+        'Authorization': 'Bearer ' + apiKey,
+        'Content-Type': 'application/json',
+        'x-v1-region': region,
+      },
+      body: JSON.stringify({ prompt: 'ping' }),
     });
     if (resp.ok || resp.status === 400) {
       document.getElementById('guardStatusCard').className = 'guard-status-card configured';
@@ -1723,9 +1725,8 @@ async function testConnection() {
       throw new Error('HTTP ' + resp.status);
     }
   } catch (e) {
-    const isCors = e.message.includes('fetch') || e.name === 'TypeError';
     document.getElementById('guardStatusCard').className = 'guard-status-card error';
-    document.getElementById('guardStatusCard').innerHTML = `<span class="status-icon">❌</span><div><div style="font-weight:700;font-size:.8rem">${isCors ? 'CORS restriction' : 'Connection failed'}</div><div style="font-size:.7rem;margin-top:.15rem">${isCors ? 'Browser CORS policy blocked the request. The integration works correctly when deployed behind a backend proxy.' : e.message}</div></div>`;
+    document.getElementById('guardStatusCard').innerHTML = `<span class="status-icon">❌</span><div><div style="font-weight:700;font-size:.8rem">Connection failed</div><div style="font-size:.7rem;margin-top:.15rem">${e.message}</div></div>`;
   }
   btn.textContent = 'Test Connection'; btn.disabled = false;
 }
