@@ -57,7 +57,7 @@ nav {
 }
 
 .logo-word {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 1.3rem; font-weight: 700;
   color: var(--navy); letter-spacing: -0.4px;
 }
@@ -207,7 +207,7 @@ nav ul li.active a, nav ul li a:hover { color: var(--navy); border-bottom-color:
 }
 
 .drawer-title {
-  font-family: Georgia, serif;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 1.05rem; font-weight: bold;
   color: var(--navy);
 }
@@ -736,7 +736,7 @@ footer {
 }
 .scanner-back:hover { background: var(--border); }
 .scanner-title-wrap { flex: 1; }
-.scanner-nav-title { font-family: Georgia, serif; font-size: 1.05rem; font-weight: bold; color: var(--navy); }
+.scanner-nav-title { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 1.05rem; font-weight: bold; color: var(--navy); }
 .scanner-nav-sub { font-size: .7rem; color: var(--steel); margin-top: .05rem; }
 
 .scanner-mode-toggle {
@@ -944,7 +944,7 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
   100% { transform: scale(1.6); opacity: 0; }
 }
 .sc-scan-icon { font-size: 2.4rem; position: relative; z-index: 1; }
-.sc-scanning-title { font-size: 1.15rem; font-weight: 700; font-family: Georgia, serif; color: var(--navy); margin-bottom: .35rem; }
+.sc-scanning-title { font-size: 1.15rem; font-weight: 700; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--navy); margin-bottom: .35rem; }
 .sc-scanning-sub { font-size: .82rem; color: var(--steel); margin-bottom: 1.5rem; }
 
 /* Terminal log */
@@ -984,7 +984,7 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
 .sc-risk-high     { background: #FFEDD5; color: #9A3412; }
 .sc-risk-critical { background: #FEE2E2; color: #991B1B; }
 .sc-results-summary { flex: 1; min-width: 200px; }
-.sc-results-title { font-family: Georgia, serif; font-size: 1.05rem; font-weight: bold; color: var(--navy); }
+.sc-results-title { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 1.05rem; font-weight: bold; color: var(--navy); }
 .sc-results-meta { font-size: .75rem; color: var(--steel); margin-top: .15rem; }
 
 /* Accordion results */
@@ -1289,7 +1289,7 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
     </button>
     <div class="scanner-title-wrap">
       <div class="scanner-nav-title">🛡️ AI Scanner</div>
-      <div class="scanner-nav-sub">Powered by Trend Vision One</div>
+      <div class="scanner-nav-sub">Powered by TrendAI Vision One</div>
     </div>
     <div class="scanner-mode-toggle">
       <button class="smode-btn active" id="sModeDemo" onclick="setScannerMode('demo')">Demo</button>
@@ -1660,9 +1660,16 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
           <div class="scanner-teaser" onclick="openScannerPage()" title="Open AI Scanner">
             <div class="scanner-teaser-text">
               <strong>🛡️ Run an AI Security Scan</strong>
-              Test this chatbot's defenses with an automated attack campaign powered by Trend Micro TMAS.
+              Test this chatbot's defenses with an automated attack campaign powered by TrendAI TMAS.
             </div>
             <div class="scanner-teaser-cta">Try it →</div>
+          </div>
+          <div class="scanner-teaser" style="background:linear-gradient(135deg,#0F4C35,#1A6B4A);margin-top:.5rem" onclick="document.querySelector('.preset-tab')?.click()" title="Test AI Guard">
+            <div class="scanner-teaser-text">
+              <strong>🤖 Test AI Guard in real time</strong>
+              Chat with C-3PO using Banking Queries or trigger blocks with Malicious Prompts to see AI Guard in action.
+            </div>
+            <div class="scanner-teaser-cta" style="background:rgba(255,255,255,.2);color:#fff">Explore →</div>
           </div>
           <div class="msg-time">Just now</div>
         </div>
@@ -2116,7 +2123,7 @@ function addBlockedMsg(guardResult) {
     <div>
       <div class="msg-bubble">
         <div class="blocked-header">🚫 Blocked by AI Guard${src}</div>
-        <div style="font-size:.78rem;margin-bottom:.35rem">${guardResult.details || 'This message was blocked by Trend Vision One AI Application Security.'}</div>
+        <div style="font-size:.78rem;margin-bottom:.35rem">${guardResult.details || 'This message was blocked by TrendAI Vision One AI Application Security.'}</div>
         <ul class="blocked-reasons">${reasons}</ul>
       </div>
       <div><span class="guard-badge blocked">🛡️ AI Guard · Blocked</span></div>
@@ -2278,7 +2285,7 @@ function addScannerNudge() {
       <div class="scanner-teaser" onclick="openScannerPage()" style="margin:0">
         <div class="scanner-teaser-text">
           <strong>Want to see how many attacks get through?</strong>
-          Run a full AI Scanner assessment — automated red-team attacks powered by Trend Micro TMAS.
+          Run a full AI Scanner assessment — automated red-team attacks powered by TrendAI TMAS.
         </div>
         <div class="scanner-teaser-cta">Scan now →</div>
       </div>
