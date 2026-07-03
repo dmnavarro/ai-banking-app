@@ -187,7 +187,7 @@ app.post('/api/scanner/tmas', (req, res) => {
   const { target, objectives } = req.body || {};
   if (!target || !target.url) return res.status(400).json({ error: 'target.url is required' });
 
-  const apiKey = process.env.TMAS_API_KEY;
+  const apiKey = (process.env.TMAS_API_KEY || '').trim();
   if (!apiKey) return res.status(503).json({ error: 'TMAS_API_KEY not configured on this server' });
 
   const jobId  = randomUUID();
