@@ -26,11 +26,21 @@ const REGIONS = {
   ca: 'https://api.ca.xdr.trendmicro.com',
 };
 
+// Expose whether a server-side default API key is configured
+app.get('/api/config', (_req, res) => {
+  res.json({ hasDefaultApiKey: !!(process.env.TMAS_API_KEY || '').trim() });
+});
+
 // Transparent proxy — forwards Authorization + V1 headers to bypass browser CORS
+// Falls back to TMAS_API_KEY if client sends no Authorization header
 app.post('/api/aiguard/scan', async (req, res) => {
   const region  = req.headers['x-v1-region'] || 'sg';
   const baseUrl = REGIONS[region] || REGIONS['sg'];
   const url     = baseUrl + '/v3.0/aiSecurity/applyGuardrails?detailedResponse=true';
+
+  const clientAuth  = req.headers['authorization'];
+  const defaultKey  = (process.env.TMAS_API_KEY || '').trim();
+  const authHeader  = clientAuth || (defaultKey ? `Bearer ${defaultKey}` : '');
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
@@ -39,7 +49,7 @@ app.post('/api/aiguard/scan', async (req, res) => {
     const upstream = await fetch(url, {
       method:  'POST',
       headers: {
-        'Authorization':         req.headers['authorization']          || '',
+        'Authorization':         authHeader,
         'Content-Type':          'application/json',
         'TMV1-Application-Name': req.headers['tmv1-application-name'] || 'trend-bank-chatbot',
         'Prefer':                'return=representation',

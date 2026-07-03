@@ -1136,6 +1136,9 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
       <div class="drawer-section-label">Vision One Credentials</div>
       <div class="field">
         <label>API Key</label>
+        <div id="serverKeyNotice" style="display:none;margin-bottom:.5rem;padding:.55rem .75rem;background:#EDFBF4;border:1px solid #86EFCA;border-radius:8px;font-size:.76rem;color:#07714A;">
+          🔑 A default API key is configured on this server. Leave the field blank to use it, or enter a new key to override.
+        </div>
         <input type="password" id="apiKeyInput" placeholder="Enter your Vision One API key…" autocomplete="off">
         <span class="field-hint">Found in Vision One → Administration → API Keys</span>
       </div>
@@ -1661,6 +1664,12 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
 })();
 
 // ── SETTINGS ──
+let serverHasDefaultKey = false;
+fetch('/api/config').then(r => r.json()).then(cfg => {
+  serverHasDefaultKey = !!cfg.hasDefaultApiKey;
+  refreshStatusCard();
+}).catch(() => {});
+
 const REGIONS = {
   us: 'https://api.xdr.trendmicro.com',
   eu: 'https://api.eu.xdr.trendmicro.com',
@@ -1692,7 +1701,15 @@ function loadSettingsUI() {
   const demo    = localStorage.getItem('visionone_demo') === 'true';
   const version = localStorage.getItem('visionone_api_version') || 'v3.0';
 
-  document.getElementById('apiKeyInput').value    = apiKey;
+  const notice = document.getElementById('serverKeyNotice');
+  if (notice) notice.style.display = serverHasDefaultKey ? '' : 'none';
+
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  apiKeyInput.value = apiKey;
+  apiKeyInput.placeholder = serverHasDefaultKey && !apiKey
+    ? 'Using server default — enter here to override'
+    : 'Enter your Vision One API key…';
+
   document.getElementById('regionSelect').value   = region;
   document.getElementById('guardIdInput').value   = guardId;
   document.getElementById('endpointInput').value  = endpoint;
@@ -1732,7 +1749,7 @@ function saveSettings() {
 
   addSystemMsg(demo
     ? '⚙️ AI Guard enabled in Demo Mode. Threat presets will be simulated as blocked.'
-    : (apiKey ? '⚙️ AI Guard configured and active. All messages will be scanned.' : '⚙️ Settings saved. Add an API key to enable live scanning.'));
+    : (apiKey || serverHasDefaultKey ? '⚙️ AI Guard configured and active. All messages will be scanned.' : '⚙️ Settings saved. Add an API key to enable live scanning.'));
 }
 
 function refreshStatusCard() {
@@ -1743,10 +1760,11 @@ function refreshStatusCard() {
   if (demo) {
     card.classList.add('configured');
     card.innerHTML = '<span class="status-icon">🟢</span><div><div style="font-weight:700;font-size:.8rem">Demo Mode Active</div><div style="font-size:.7rem;margin-top:.15rem">Threat scenarios will be simulated as blocked by AI Guard.</div></div>';
-  } else if (apiKey) {
+  } else if (apiKey || serverHasDefaultKey) {
     const region = document.getElementById('regionSelect').value;
+    const keyLabel = apiKey ? 'Custom key set' : 'Server default key';
     card.classList.add('configured');
-    card.innerHTML = `<span class="status-icon">🟢</span><div><div style="font-weight:700;font-size:.8rem">AI Guard Configured</div><div style="font-size:.7rem;margin-top:.15rem">Region: <strong>${region.toUpperCase()}</strong> · Key set · Live scanning enabled.</div></div>`;
+    card.innerHTML = `<span class="status-icon">🟢</span><div><div style="font-weight:700;font-size:.8rem">AI Guard Configured</div><div style="font-size:.7rem;margin-top:.15rem">Region: <strong>${region.toUpperCase()}</strong> · ${keyLabel} · Live scanning enabled.</div></div>`;
   } else {
     card.classList.add('unconfigured');
     card.innerHTML = '<span class="status-icon">⚠️</span><div><div style="font-weight:700;font-size:.8rem">AI Guard not configured</div><div style="font-size:.7rem;margin-top:.15rem">Enter your Vision One API key and region to enable real-time prompt scanning.</div></div>';
@@ -1756,17 +1774,15 @@ function refreshStatusCard() {
 async function testConnection() {
   const apiKey = document.getElementById('apiKeyInput').value.trim();
   const region = document.getElementById('regionSelect').value;
-  if (!apiKey) { alert('Please enter an API key first.'); return; }
+  if (!apiKey && !serverHasDefaultKey) { alert('Please enter an API key first.'); return; }
   const btn = document.getElementById('testBtn');
   btn.textContent = 'Testing…'; btn.disabled = true;
   try {
+    const testHeaders = { 'Content-Type': 'application/json', 'x-v1-region': region };
+    if (apiKey) testHeaders['Authorization'] = 'Bearer ' + apiKey;
     const resp = await fetch('/api/aiguard/scan', {
       method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + apiKey,
-        'Content-Type': 'application/json',
-        'x-v1-region': region,
-      },
+      headers: testHeaders,
       body: JSON.stringify({ prompt: 'ping' }),
     });
     if (resp.ok || resp.status === 400) {
@@ -1881,23 +1897,26 @@ async function callAIGuard(prompt) {
     return { blocked: false, source: 'demo' };
   }
 
-  // Live mode but no API key
-  if (!apiKey) return { blocked: false, source: 'unconfigured' };
+  // Live mode but no key at all (neither user nor server default)
+  if (!apiKey && !serverHasDefaultKey) return { blocked: false, source: 'unconfigured' };
 
   // Live API call — proxy forwards Authorization header to Vision One (bypasses CORS)
+  // If no user key, server falls back to its own TMAS_API_KEY
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
 
+    const headers = {
+      'Content-Type':          'application/json',
+      'X-V1-Region':           region,
+      'TMV1-Application-Name': guardId || 'trend-bank-chatbot',
+      'Prefer':                'return=representation',
+    };
+    if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+
     const resp = await fetch('/api/aiguard/scan', {
       method: 'POST',
-      headers: {
-        'Content-Type':          'application/json',
-        'Authorization':         'Bearer ' + apiKey,
-        'X-V1-Region':           region,
-        'TMV1-Application-Name': guardId || 'trend-bank-chatbot',
-        'Prefer':                'return=representation',
-      },
+      headers,
       body: JSON.stringify({ prompt }),
       signal: controller.signal,
     }).finally(() => clearTimeout(timeout));
