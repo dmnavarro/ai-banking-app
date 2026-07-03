@@ -19,6 +19,8 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      TMAS_API_KEY: ${{ secrets.TMAS_API_KEY }}
 
     steps:
       - name: Checkout
@@ -50,7 +52,7 @@ jobs:
           echo "image=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
       - name: Code Security Scan (TMAS)
-        if: ${{ secrets.TMAS_API_KEY != '' }}
+        if: ${{ env.TMAS_API_KEY != '' }}
         uses: trendmicro/tmas-scan-action@v3.1.3
         with:
           vulnerabilitiesScan: true
