@@ -4,10 +4,11 @@ WORKDIR /app
 
 # Install TMAS CLI
 RUN apk add --no-cache curl tar && \
-    curl -L https://cli.artifactscan.cloudone.trendmicro.com/tmas-cli/latest/tmas-linux-amd64.tar.gz \
+    curl -fSL --retry 3 --retry-delay 2 \
+      "https://ast-cli.xdr.trendmicro.com/tmas-cli/latest/tmas-cli_Linux_x86_64.tar.gz" \
       -o /tmp/tmas.tar.gz && \
     tar -xzf /tmp/tmas.tar.gz -C /tmp && \
-    mv /tmp/tmas /usr/local/bin/tmas && \
+    mv /tmp/tmas-cli /usr/local/bin/tmas && \
     chmod +x /usr/local/bin/tmas && \
     rm /tmp/tmas.tar.gz
 
