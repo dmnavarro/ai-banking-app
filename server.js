@@ -223,8 +223,10 @@ app.post('/api/scanner/tmas', (req, res) => {
   const cleanup = () => fs.rmSync(runDir, { recursive: true, force: true });
   const finalize = () => setTimeout(() => tmasJobs.delete(jobId), 10 * 60 * 1000);
 
+  let stderrBuf = '';
   proc.stderr.on('data', d => {
     d.toString().split('\n').filter(Boolean).forEach(line => {
+      stderrBuf += line + '\n';
       process.stdout.write(`[TMAS] ${line}\n`);
       emit('log', { message: line, level: 'dim' });
     });
@@ -234,7 +236,7 @@ app.post('/api/scanner/tmas', (req, res) => {
     console.log(`[TMAS] job=${jobId} exit=${code}`);
     try {
       if (code !== 0) {
-        job.error = `tmas exited with code ${code}`;
+        job.error = stderrBuf.trim() || `tmas exited with code ${code}`;
         emit('error', { message: job.error });
       } else {
         job.results = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
