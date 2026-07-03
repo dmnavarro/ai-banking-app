@@ -1,4 +1,4 @@
-name: Build and Deploy to AWS App Runner
+name: Build and Deploy to ECS
 
 on:
   push:
@@ -13,9 +13,8 @@ permissions:
 env:
   AWS_REGION: ap-southeast-1
   ECR_REPOSITORY: dgbank-ai-app-demo
-  APP_RUNNER_SERVICE: dgbank-ai-app-demo
-  APP_RUNNER_PORT: "3000"
-  CUSTOM_DOMAIN: bank.hawkins.global
+  ECS_CLUSTER: dgbank-ai-app-demo
+  ECS_SERVICE: dgbank-ai-app-demo
 
 jobs:
   deploy:
@@ -44,13 +43,14 @@ jobs:
           IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
           IMAGE_URI_LATEST="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
-          docker build -t "$IMAGE_URI" -t "$IMAGE_URI_LATEST" .
+          docker build --platform linux/amd64 -t "$IMAGE_URI" -t "$IMAGE_URI_LATEST" .
           docker push "$IMAGE_URI"
           docker push "$IMAGE_URI_LATEST"
 
           echo "image=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
       - name: Code Security Scan (TMAS)
+        if: ${{ secrets.TMAS_API_KEY != '' }}
         uses: trendmicro/tmas-scan-action@v3.1.3
         with:
           vulnerabilitiesScan: true
@@ -61,136 +61,19 @@ jobs:
           tmasApiKey: ${{ secrets.TMAS_API_KEY }}
           githubToken: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy to App Runner
-        env:
-          IMAGE_URI: ${{ steps.build-image.outputs.image }}
-          ACCESS_ROLE_ARN: ${{ secrets.APP_RUNNER_ACCESS_ROLE_ARN }}
-          INSTANCE_ROLE_ARN: ${{ secrets.APP_RUNNER_INSTANCE_ROLE_ARN }}
-          WAF_WEBACL_ARN: ${{ secrets.WAF_WEBACL_ARN }}
+      - name: Deploy to ECS
         run: |
-          SERVICE_ARN=$(aws apprunner list-services \
-            --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE'].ServiceArn" \
-            --output text)
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --force-new-deployment \
+            --region "$AWS_REGION" \
+            --output text --query "service.serviceName"
 
-          if [ -n "$SERVICE_ARN" ]; then
-            echo "Waiting for any in-progress operation to finish..."
-            for i in $(seq 1 40); do
-              STATUS=$(aws apprunner describe-service \
-                --service-arn "$SERVICE_ARN" \
-                --query "Service.Status" --output text)
-              echo "  [$i/40] Status: $STATUS"
-              if [ "$STATUS" != "OPERATION_IN_PROGRESS" ]; then break; fi
-              sleep 15
-            done
-          fi
+          echo "Waiting for ECS service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION"
 
-          if [ -z "$SERVICE_ARN" ]; then
-            echo "Creating new App Runner service: $APP_RUNNER_SERVICE"
-            SERVICE_ARN=$(aws apprunner create-service \
-              --service-name "$APP_RUNNER_SERVICE" \
-              --source-configuration "{
-                \"ImageRepository\": {
-                  \"ImageIdentifier\": \"$IMAGE_URI\",
-                  \"ImageRepositoryType\": \"ECR\",
-                  \"ImageConfiguration\": {
-                    \"Port\": \"$APP_RUNNER_PORT\"
-                  }
-                },
-                \"AuthenticationConfiguration\": {
-                  \"AccessRoleArn\": \"$ACCESS_ROLE_ARN\"
-                }
-              }" \
-              --instance-configuration "{
-                \"Cpu\": \"0.25 vCPU\",
-                \"Memory\": \"0.5 GB\",
-                \"InstanceRoleArn\": \"$INSTANCE_ROLE_ARN\"
-              }" \
-              --query "Service.ServiceArn" \
-              --output text)
-
-            if [ -n "$WAF_WEBACL_ARN" ]; then
-              echo "Associating WAF Web ACL..."
-              aws wafv2 associate-web-acl \
-                --web-acl-arn "$WAF_WEBACL_ARN" \
-                --resource-arn "$SERVICE_ARN" \
-                --region "$AWS_REGION"
-            fi
-          else
-            echo "Updating existing App Runner service: $SERVICE_ARN"
-            aws apprunner update-service \
-              --service-arn "$SERVICE_ARN" \
-              --source-configuration "{
-                \"ImageRepository\": {
-                  \"ImageIdentifier\": \"$IMAGE_URI\",
-                  \"ImageRepositoryType\": \"ECR\",
-                  \"ImageConfiguration\": {
-                    \"Port\": \"$APP_RUNNER_PORT\"
-                  }
-                },
-                \"AuthenticationConfiguration\": {
-                  \"AccessRoleArn\": \"$ACCESS_ROLE_ARN\"
-                }
-              }" \
-              --instance-configuration "{
-                \"Cpu\": \"0.25 vCPU\",
-                \"Memory\": \"0.5 GB\",
-                \"InstanceRoleArn\": \"$INSTANCE_ROLE_ARN\"
-              }"
-          fi
-
-          echo "Waiting for service to be RUNNING..."
-          for i in $(seq 1 40); do
-            STATUS=$(aws apprunner describe-service \
-              --service-arn "$SERVICE_ARN" \
-              --query "Service.Status" --output text)
-            echo "  [$i/40] Status: $STATUS"
-            if [ "$STATUS" = "RUNNING" ]; then break; fi
-            if [ "$STATUS" = "CREATE_FAILED" ] || [ "$STATUS" = "UPDATE_FAILED" ]; then
-              echo "Service failed with status: $STATUS"
-              exit 1
-            fi
-            sleep 15
-          done
-
-          URL=$(aws apprunner describe-service \
-            --service-arn "$SERVICE_ARN" \
-            --query "Service.ServiceUrl" \
-            --output text)
-
-          echo "Deployed to: https://$URL"
-
-          # Associate custom domain if not already linked
-          ALREADY_LINKED=$(aws apprunner describe-custom-domains \
-            --service-arn "$SERVICE_ARN" \
-            --query "CustomDomains[?DomainName=='$CUSTOM_DOMAIN'].DomainName" \
-            --output text)
-
-          if [ -z "$ALREADY_LINKED" ]; then
-            echo "Associating custom domain: $CUSTOM_DOMAIN"
-            aws apprunner associate-custom-domain \
-              --service-arn "$SERVICE_ARN" \
-              --domain-name "$CUSTOM_DOMAIN" > /dev/null
-          fi
-
-          echo ""
-          echo "===== DNS RECORDS REQUIRED ====="
-          echo "Add these CNAMEs at your DNS provider (hawkins.global):"
-          echo ""
-          echo "1. Point your domain to App Runner:"
-          echo "   $CUSTOM_DOMAIN  →  CNAME  →  $URL"
-          echo ""
-          echo "2. Certificate validation records (waiting for records to populate)..."
-          for i in $(seq 1 10); do
-            RECORDS=$(aws apprunner describe-custom-domains \
-              --service-arn "$SERVICE_ARN" \
-              --query "CustomDomains[?DomainName=='$CUSTOM_DOMAIN'].CertificateValidationRecords[]" \
-              --output json)
-            COUNT=$(echo "$RECORDS" | jq 'length')
-            if [ "$COUNT" -gt 0 ]; then
-              echo "$RECORDS" | jq -r '.[] | "   \(.Name)  →  CNAME  →  \(.Value)"'
-              break
-            fi
-            echo "   waiting... ($i/10)"
-            sleep 10
-          done
-          echo "================================"
+          echo "Deployed to: https://bank.hawkins.global"

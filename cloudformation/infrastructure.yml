@@ -37,6 +37,7 @@ Resources:
     Type: AWS::ECR::Repository
     Properties:
       RepositoryName: dgbank-ai-app-demo
+      EmptyOnDelete: true
       ImageScanningConfiguration:
         ScanOnPush: true
       LifecyclePolicy:

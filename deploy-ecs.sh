@@ -2,11 +2,19 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Trend Bank — ECS on EC2 deploy script
+# DG Bank — ECS on EC2 deploy script
 # Usage: ./deploy-ecs.sh --github-org <org> [options]
+#
+# What this script does (in order):
+#   1. Create ECR repo if it doesn't exist
+#   2. Build & push Docker image (linux/amd64)
+#   3. Deploy CloudFormation stack (VPC, ECS, ALB, IAM, OIDC)
+#   4. Wait for ECS service to stabilize
+#   5. Print App URL, DNS target, and GitHub Actions role ARN
 # ---------------------------------------------------------------------------
 
 STACK_NAME="dgbank-ai-app-demo-ecs"
+ECR_REPO="dgbank-ai-app-demo"
 REGION="ap-southeast-1"
 INSTANCE_TYPE="t3.small"
 BEDROCK_REGION="ap-southeast-1"
@@ -37,7 +45,6 @@ EOF
   exit 0
 }
 
-# Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
     --github-org)      GITHUB_ORG="$2";        shift 2 ;;
@@ -49,7 +56,7 @@ while [[ $# -gt 0 ]]; do
     --certificate-arn) CERTIFICATE_ARN="$2";   shift 2 ;;
     --skip-oidc)       CREATE_OIDC="false";    shift ;;
     --stack-name)      STACK_NAME="$2";        shift 2 ;;
-    --help)          usage ;;
+    --help)            usage ;;
     *) echo "Unknown option: $1"; usage ;;
   esac
 done
@@ -63,7 +70,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE="$SCRIPT_DIR/cloudformation/ecs.yml"
 
 # ---------------------------------------------------------------------------
-# Check prerequisites
+# Prerequisites
 # ---------------------------------------------------------------------------
 echo ""
 echo "Checking prerequisites..."
@@ -75,13 +82,44 @@ for cmd in aws docker; do
 done
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+ECR_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$ECR_REPO"
+
 echo "AWS account : $ACCOUNT_ID"
 echo "Region      : $REGION"
 echo "GitHub org  : $GITHUB_ORG/$GITHUB_REPO"
+echo "ECR repo    : $ECR_URI"
 echo ""
 
 # ---------------------------------------------------------------------------
-# Deploy CloudFormation stack
+# Step 1 — Ensure ECR repository exists
+# ---------------------------------------------------------------------------
+echo "Ensuring ECR repository exists..."
+aws ecr describe-repositories --repository-names "$ECR_REPO" --region "$REGION" > /dev/null 2>&1 || \
+  aws ecr create-repository \
+    --repository-name "$ECR_REPO" \
+    --region "$REGION" \
+    --image-scanning-configuration scanOnPush=true > /dev/null
+echo "ECR repository ready."
+echo ""
+
+# ---------------------------------------------------------------------------
+# Step 2 — Build and push Docker image
+# ---------------------------------------------------------------------------
+echo "Logging in to ECR..."
+aws ecr get-login-password --region "$REGION" \
+  | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
+
+echo "Building Docker image (linux/amd64)..."
+docker build --platform linux/amd64 -t "$ECR_REPO" "$SCRIPT_DIR"
+
+echo "Pushing image to ECR..."
+docker tag "$ECR_REPO:latest" "$ECR_URI:latest"
+docker push "$ECR_URI:latest"
+echo "Image pushed."
+echo ""
+
+# ---------------------------------------------------------------------------
+# Step 3 — Deploy CloudFormation stack
 # ---------------------------------------------------------------------------
 echo "Deploying CloudFormation stack: $STACK_NAME ..."
 aws cloudformation deploy \
@@ -99,7 +137,6 @@ aws cloudformation deploy \
     BedrockModelId="$BEDROCK_MODEL_ID" \
     CertificateArn="$CERTIFICATE_ARN" || true
 
-# Verify the stack is actually in a healthy state
 STACK_STATUS=$(aws cloudformation describe-stacks \
   --stack-name "$STACK_NAME" --region "$REGION" \
   --query "Stacks[0].StackStatus" --output text)
@@ -109,7 +146,6 @@ if [[ "$STACK_STATUS" != *"COMPLETE" ]]; then
   echo "Run: aws cloudformation describe-stack-events --stack-name $STACK_NAME --region $REGION"
   exit 1
 fi
-
 echo "Stack status: $STACK_STATUS"
 echo ""
 
@@ -124,35 +160,14 @@ get_output() {
     --output text
 }
 
-ECR_URI=$(get_output "ECRRepositoryUri")
 APP_URL=$(get_output "AppURL")
 ALB_DNS=$(get_output "ALBDNSName")
 GITHUB_ROLE=$(get_output "GitHubActionsRoleArn")
 ECS_CLUSTER=$(get_output "ECSClusterName")
 ECS_SERVICE=$(get_output "ECSServiceName")
 
-echo "ECR URI     : $ECR_URI"
-echo "App URL     : $APP_URL"
-echo ""
-
 # ---------------------------------------------------------------------------
-# Build and push Docker image
-# ---------------------------------------------------------------------------
-echo "Logging in to ECR..."
-aws ecr get-login-password --region "$REGION" \
-  | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
-
-echo "Building Docker image..."
-docker build -t dgbank-ai-app-demo "$SCRIPT_DIR"
-
-echo "Tagging and pushing image..."
-docker tag dgbank-ai-app-demo:latest "$ECR_URI:latest"
-docker push "$ECR_URI:latest"
-echo "Image pushed."
-echo ""
-
-# ---------------------------------------------------------------------------
-# Force ECS redeployment to pick up the new image
+# Step 4 — Force ECS service to pick up the new image
 # ---------------------------------------------------------------------------
 echo "Triggering ECS redeployment..."
 aws ecs update-service \
@@ -162,7 +177,7 @@ aws ecs update-service \
   --region "$REGION" \
   --output text --query "service.serviceName" > /dev/null
 
-echo "Waiting for service to stabilize (this takes ~2 minutes)..."
+echo "Waiting for service to stabilize (~2 minutes)..."
 aws ecs wait services-stable \
   --cluster "$ECS_CLUSTER" \
   --services "$ECS_SERVICE" \
@@ -177,9 +192,14 @@ echo "  DG Bank is live!"
 echo "  $APP_URL"
 echo "================================================="
 echo ""
-echo "DNS — point your domain CNAME to:"
-echo "  $ALB_DNS"
+echo "Next steps:"
 echo ""
-echo "GitHub Actions secret to add:"
-echo "  AWS_ROLE_ARN = $GITHUB_ROLE"
+echo "1. DNS — set this CNAME at your DNS provider:"
+echo "   bank.hawkins.global  →  $ALB_DNS"
+echo ""
+echo "2. GitHub Actions — add this secret to your repo:"
+echo "   AWS_ROLE_ARN = $GITHUB_ROLE"
+echo "   (Settings → Secrets and variables → Actions → New repository secret)"
+echo ""
+echo "3. Push to main — GitHub Actions will auto-deploy on every push."
 echo ""
