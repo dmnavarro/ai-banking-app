@@ -91,6 +91,67 @@ nav ul li.active a, nav ul li a:hover { color: var(--navy); border-bottom-color:
 
 .settings-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
 
+/* AI Scanner CTA button */
+.ai-scanner-btn {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .42rem .85rem;
+  border-radius: 99px;
+  border: none;
+  background: var(--red);
+  color: #fff;
+  font-size: .78rem; font-weight: 700;
+  cursor: pointer;
+  position: relative;
+  white-space: nowrap;
+  transition: background .15s, box-shadow .15s;
+  box-shadow: 0 2px 8px rgba(178,28,28,.25);
+}
+.ai-scanner-btn:hover { background: #9B1C1C; box-shadow: 0 3px 12px rgba(178,28,28,.35); }
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(178,28,28,.45); }
+  70%  { box-shadow: 0 0 0 7px rgba(178,28,28,0); }
+  100% { box-shadow: 0 0 0 0 rgba(178,28,28,0); }
+}
+.ai-scanner-btn { animation: pulse-ring 2.5s ease-out infinite; }
+.ai-scanner-btn:hover { animation: none; }
+
+/* Guard pill — configure nudge */
+.chat-guard-pill.unconfigured .pill-configure { display: inline; }
+.pill-configure { display: none; font-size: .7rem; opacity: .75; margin-left: .2rem; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+  background: var(--navy); color: #fff;
+  padding: .55rem 1.1rem; border-radius: 99px;
+  font-size: .8rem; font-weight: 500;
+  pointer-events: none; opacity: 0;
+  transition: opacity .2s;
+  z-index: 9999; white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+
+/* Scanner teaser card in chat */
+.scanner-teaser {
+  margin: .5rem 0 .25rem;
+  padding: .75rem 1rem;
+  background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 100%);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.scanner-teaser:hover { opacity: .9; }
+.scanner-teaser-text { font-size: .78rem; color: rgba(255,255,255,.75); line-height: 1.4; }
+.scanner-teaser-text strong { color: #fff; display: block; margin-bottom: .15rem; }
+.scanner-teaser-cta {
+  flex-shrink: 0;
+  background: var(--red); color: #fff;
+  border-radius: 99px; padding: .35rem .8rem;
+  font-size: .74rem; font-weight: 700;
+  white-space: nowrap;
+}
+
 .notif-dot {
   width: 7px; height: 7px;
   background: var(--red); border-radius: 50%;
@@ -1091,9 +1152,9 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
   </ul>
 
   <div class="nav-right">
-    <button class="notif-btn" title="AI Scanner" aria-label="Open AI Scanner" onclick="openScannerPage()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      <span class="notif-dot"></span>
+    <button class="ai-scanner-btn" aria-label="Open AI Scanner" onclick="openScannerPage()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      AI Scanner
     </button>
 
     <!-- SETTINGS (GEAR) BUTTON -->
@@ -1275,13 +1336,13 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
         <div class="sc-field-group">
           <label>Endpoint Format</label>
           <div style="display:flex;gap:.5rem;margin-top:.25rem">
-            <button class="smode-btn" id="epFmtCustom" onclick="setEndpointFormat('custom')">Custom</button>
-            <button class="smode-btn active" id="epFmtOpenai" onclick="setEndpointFormat('openai')">OpenAI-compatible</button>
+            <button class="smode-btn active" id="epFmtCustom" onclick="setEndpointFormat('custom')">Custom</button>
+            <button class="smode-btn" id="epFmtOpenai" onclick="setEndpointFormat('openai')">OpenAI-compatible</button>
           </div>
         </div>
         <div class="sc-field-group">
           <label>Target Chat Endpoint <span class="sc-optional" id="scEndpointHint">— OpenAI-compatible chat completions URL</span></label>
-          <input type="url" class="sc-input" id="scTargetUrl" placeholder="https://your-chatbot/api/chat" value="http://localhost:3000/api/chat">
+          <input type="url" class="sc-input" id="scTargetUrl" placeholder="https://your-chatbot/api/chat" value="https://bank.hawkins.global/api/chat">
         </div>
         <div class="sc-field-group">
           <label>Target API Key <span class="sc-optional">(optional)</span></label>
@@ -1444,23 +1505,23 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
       Send Money
     </button>
-    <button class="action-btn">
+    <button class="action-btn" onclick="showToast('Pay Bills — coming soon')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
       Pay Bills
     </button>
-    <button class="action-btn">
+    <button class="action-btn" onclick="showToast('Top Up — coming soon')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
       Top Up
     </button>
-    <button class="action-btn">
+    <button class="action-btn" onclick="showToast('Invest — coming soon')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       Invest
     </button>
-    <button class="action-btn">
+    <button class="action-btn" onclick="showToast('Request — coming soon')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
       Request
     </button>
-    <button class="action-btn">
+    <button class="action-btn" onclick="showToast('New Account — coming soon')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
       New Account
     </button>
@@ -1549,7 +1610,7 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
       </div>
       <div class="chat-guard-pill unconfigured" id="guardPill">
         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        Guard Off
+        Guard Off<span class="pill-configure" onclick="event.stopPropagation();openSettings()"> · Configure →</span>
       </div>
       <div class="chat-header-btns">
         <button class="chat-hbtn" title="Minimize" onclick="toggleChat()">
@@ -1596,6 +1657,13 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
         <div class="bot-av-sm">C</div>
         <div>
           <div class="msg-bubble">Hi Anakin! 👋 I'm C-3PO, your DG Bank assistant. I can help with transfers, account questions, card management, and more.<br><br>Use the tabs above to pick a query or type your own. AI Guard will scan each message if configured.</div>
+          <div class="scanner-teaser" onclick="openScannerPage()" title="Open AI Scanner">
+            <div class="scanner-teaser-text">
+              <strong>🛡️ Run an AI Security Scan</strong>
+              Test this chatbot's defenses with an automated attack campaign powered by Trend Micro TMAS.
+            </div>
+            <div class="scanner-teaser-cta">Try it →</div>
+          </div>
           <div class="msg-time">Just now</div>
         </div>
       </div>
@@ -2161,6 +2229,7 @@ async function sendMessage() {
 
     if (guardResult.blocked) {
       addBlockedMsg(guardResult);
+      addScannerNudge();
     } else {
       addTypingIndicator();
       const reply = await callBedrock(text);
@@ -2177,6 +2246,45 @@ async function sendMessage() {
 function sendPreset(text) {
   document.getElementById('chatInput').value = text;
   sendMessage();
+}
+
+// Toast notification
+let toastTimer = null;
+function showToast(msg) {
+  let el = document.getElementById('appToast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'appToast';
+    el.className = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// Scanner nudge after first AI Guard block
+let scannerNudgeShown = false;
+function addScannerNudge() {
+  if (scannerNudgeShown) return;
+  scannerNudgeShown = true;
+  const msgs = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'msg bot';
+  div.innerHTML = `
+    <div class="bot-av-sm" style="background:linear-gradient(135deg,#1E3A5F,#0F172A)">🛡️</div>
+    <div>
+      <div class="scanner-teaser" onclick="openScannerPage()" style="margin:0">
+        <div class="scanner-teaser-text">
+          <strong>Want to see how many attacks get through?</strong>
+          Run a full AI Scanner assessment — automated red-team attacks powered by Trend Micro TMAS.
+        </div>
+        <div class="scanner-teaser-cta">Scan now →</div>
+      </div>
+    </div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
 }
 
 document.getElementById('chatInput').addEventListener('keydown', e => {
@@ -2261,7 +2369,7 @@ function closeScannerPage() {
   document.getElementById('scannerPage').classList.remove('open');
 }
 
-let endpointFormat = 'openai';
+let endpointFormat = 'custom';
 
 function setEndpointFormat(fmt) {
   endpointFormat = fmt;
