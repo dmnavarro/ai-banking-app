@@ -1113,7 +1113,7 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
 <div class="settings-drawer" id="settingsDrawer">
   <div class="drawer-head">
     <div>
-      <div class="drawer-title">AI Guard Configuration</div>
+      <div class="drawer-title">AI Application Security Configuration</div>
       <div class="drawer-sub">Vision One · AI Application Security</div>
     </div>
     <button class="drawer-close" onclick="closeSettings()">
@@ -1686,7 +1686,7 @@ function closeSettings() {
 
 function loadSettingsUI() {
   const apiKey  = localStorage.getItem('visionone_api_key') || '';
-  const region  = localStorage.getItem('visionone_region') || 'us';
+  const region  = localStorage.getItem('visionone_region') || 'sg';
   const guardId = localStorage.getItem('visionone_guard_id') || '';
   const endpoint = localStorage.getItem('visionone_endpoint') || '/v3.0/aiSecurity/applyGuardrails';
   const demo    = localStorage.getItem('visionone_demo') === 'true';
