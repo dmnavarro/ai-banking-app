@@ -12,8 +12,8 @@ permissions:
 
 env:
   AWS_REGION: ap-southeast-1
-  ECR_REPOSITORY: trend-bank
-  APP_RUNNER_SERVICE: trend-bank
+  ECR_REPOSITORY: dgbank-ai-app-demo
+  APP_RUNNER_SERVICE: dgbank-ai-app-demo
   APP_RUNNER_PORT: "3000"
   CUSTOM_DOMAIN: bank.hawkins.global
 

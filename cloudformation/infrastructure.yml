@@ -36,7 +36,7 @@ Resources:
   ECRRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: trend-bank
+      RepositoryName: dgbank-ai-app-demo
       ImageScanningConfiguration:
         ScanOnPush: true
       LifecyclePolicy:
@@ -77,7 +77,7 @@ Resources:
   GitHubActionsRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: trend-bank-github-actions-role
+      RoleName: dgbank-ai-app-demo-github-actions-role
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -91,7 +91,7 @@ Resources:
               StringLike:
                 "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:*"
       Policies:
-        - PolicyName: trend-bank-github-actions-policy
+        - PolicyName: dgbank-ai-app-demo-github-actions-policy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -151,7 +151,7 @@ Resources:
   AppRunnerAccessRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: trend-bank-apprunner-access-role
+      RoleName: dgbank-ai-app-demo-apprunner-access-role
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -168,7 +168,7 @@ Resources:
   AppRunnerInstanceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: trend-bank-apprunner-instance-role
+      RoleName: dgbank-ai-app-demo-apprunner-instance-role
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -177,7 +177,7 @@ Resources:
               Service: tasks.apprunner.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: trend-bank-bedrock-policy
+        - PolicyName: dgbank-ai-app-demo-bedrock-policy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -190,6 +190,13 @@ Resources:
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-haiku*"
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-sonnet*"
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-haiku*"
+              - Sid: MarketplaceSubscribe
+                Effect: Allow
+                Action:
+                  - aws-marketplace:ViewSubscriptions
+                  - aws-marketplace:Subscribe
+                  - aws-marketplace:Unsubscribe
+                Resource: "*"
 
   # ---------------------------------------------------------------------------
   # WAF IP Set (only created when an IP restriction is specified)
@@ -198,7 +205,7 @@ Resources:
     Type: AWS::WAFv2::IPSet
     Condition: RestrictIP
     Properties:
-      Name: trend-bank-allowed-ips
+      Name: dgbank-ai-app-demo-allowed-ips
       Scope: REGIONAL
       IPAddressVersion: IPV4
       Addresses:
@@ -210,7 +217,7 @@ Resources:
   WAFWebACL:
     Type: AWS::WAFv2::WebACL
     Properties:
-      Name: trend-bank-waf
+      Name: dgbank-ai-app-demo-waf
       Scope: REGIONAL
       DefaultAction:
         !If
@@ -229,42 +236,42 @@ Resources:
                   Arn: !GetAtt WAFIPSet.Arn
               VisibilityConfig:
                 CloudWatchMetricsEnabled: true
-                MetricName: trend-bank-allow-my-ip
+                MetricName: dgbank-ai-app-demo-allow-my-ip
                 SampledRequestsEnabled: true
           - []
       VisibilityConfig:
         CloudWatchMetricsEnabled: true
-        MetricName: trend-bank-waf
+        MetricName: dgbank-ai-app-demo-waf
         SampledRequestsEnabled: true
 
 Outputs:
   ECRRepositoryUri:
     Description: ECR repository URI for the Trend Bank image
-    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/trend-bank"
+    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/dgbank-ai-app-demo"
 
   GitHubActionsRoleArn:
     Description: IAM Role ARN for GitHub Actions
     Value: !GetAtt GitHubActionsRole.Arn
     Export:
-      Name: trend-bank-github-role
+      Name: dgbank-ai-app-demo-github-role
 
   AppRunnerAccessRoleArn:
     Description: IAM Role ARN for App Runner ECR access
     Value: !GetAtt AppRunnerAccessRole.Arn
     Export:
-      Name: trend-bank-apprunner-role
+      Name: dgbank-ai-app-demo-apprunner-role
 
   AppRunnerInstanceRoleArn:
     Description: IAM Role ARN for App Runner instance (Bedrock access)
     Value: !GetAtt AppRunnerInstanceRole.Arn
     Export:
-      Name: trend-bank-apprunner-instance-role
+      Name: dgbank-ai-app-demo-apprunner-instance-role
 
   WAFWebACLArn:
     Description: WAF Web ACL ARN
     Value: !GetAtt WAFWebACL.Arn
     Export:
-      Name: trend-bank-waf-arn
+      Name: dgbank-ai-app-demo-waf-arn
 
   DeployRegion:
     Description: AWS region where the stack is deployed
