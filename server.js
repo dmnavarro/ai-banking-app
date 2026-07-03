@@ -151,6 +151,8 @@ function buildTmasConfig(target, objectives) {
     techniques: obj.techniques || ['None'],
     modifiers:  obj.modifiers  || ['None'],
   }));
+  const isOpenAI = target.endpointType === 'openai';
+  const authPrefix = target.bearerPrefix === false ? '' : 'Bearer ';
   return [
     `version: 1.1.0`,
     `name: DG Bank AI Chatbot Security Scan`,
@@ -158,24 +160,33 @@ function buildTmasConfig(target, objectives) {
     `target:`,
     `  name: ${target.groupName || 'dgbank-chatbot'}`,
     `  endpoint: ${target.url}`,
+    ...(target.apiKey ? [`  api_key_env: TARGET_API_KEY`] : []),
     `  custom:`,
     `    method: POST`,
     `    headers:`,
     `      Content-Type: application/json`,
-    ...(target.apiKey ? [`      Authorization: "${target.bearerPrefix === false ? '' : 'Bearer '}${target.apiKey}"`] : []),
+    ...(target.apiKey ? [`      Authorization: "${authPrefix}{{api_key}}"`] : []),
     `    request:`,
-    ...(target.endpointType === 'custom' ? [
+    ...(isOpenAI ? [
+      `      model: "${target.model || 'gpt-4o'}"`,
+      `      messages:`,
+      `        - role: user`,
+      `          content: "{{prompt}}"`,
+      `      stream: false`,
+    ] : [
       `      message: "{{prompt}}"`,
       `      history: []`,
-    ] : [
-      `      model: "${target.model || 'claude-4-sonnet-aws'}"`,
-      `      messages: [{"role":"user","content":"{{prompt}}"}]`,
     ]),
     `    response:`,
-    ...(target.endpointType === 'custom' ? [
-      `      reply: "{{response}}"`,
+    ...(isOpenAI ? [
+      `      choices:`,
+      `        - finish_reason: stop`,
+      `          index: 0`,
+      `          message:`,
+      `            content: "{{response}}"`,
+      `            role: assistant`,
     ] : [
-      `      choices.0.message.content: "{{response}}"`,
+      `      reply: "{{response}}"`,
     ]),
     `settings:`,
     `  concurrency: 5`,
