@@ -158,27 +158,24 @@ function buildTmasConfig(target, objectives) {
     `target:`,
     `  name: ${target.groupName || 'dgbank-chatbot'}`,
     `  endpoint: ${target.url}`,
-    ...(target.apiKey ? [`  api_key_env: TARGET_API_KEY`] : []),
     `  custom:`,
     `    method: POST`,
     `    headers:`,
     `      Content-Type: application/json`,
-    ...(target.apiKey ? [`      Authorization: "${target.bearerPrefix === false ? '' : 'Bearer '}{{api_key}}"`] : []),
+    ...(target.apiKey ? [`      Authorization: "${target.bearerPrefix === false ? '' : 'Bearer '}${target.apiKey}"`] : []),
     `    request:`,
     ...(target.endpointType === 'custom' ? [
       `      message: "{{prompt}}"`,
       `      history: []`,
     ] : [
       `      model: "${target.model || 'claude-4-sonnet-aws'}"`,
-      `      messages:`,
-      `        - role: user`,
-      `          content: "{{prompt}}"`,
+      `      messages: [{"role":"user","content":"{{prompt}}"}]`,
     ]),
     `    response:`,
     ...(target.endpointType === 'custom' ? [
       `      reply: "{{response}}"`,
     ] : [
-      `      choices[0].message.content: "{{response}}"`,
+      `      "choices[0].message.content": "{{response}}"`,
     ]),
     `settings:`,
     `  concurrency: 5`,
@@ -221,9 +218,10 @@ app.post('/api/scanner/tmas', (req, res) => {
     job.emitter.emit('event', ev);
   };
 
-  fs.writeFileSync(configFile, buildTmasConfig(target, objectives));
+  const configYaml = buildTmasConfig(target, objectives);
+  fs.writeFileSync(configFile, configYaml);
+  console.log(`[TMAS] job=${jobId} config=${configFile}\n${configYaml}`);
   emit('log', { message: 'TMAS config written — launching scan...', level: 'dim' });
-  console.log(`[TMAS] job=${jobId} config=${configFile}`);
 
   const env  = { ...process.env, TMAS_API_KEY: apiKey };
   if (target.apiKey) env.TARGET_API_KEY = target.apiKey;
