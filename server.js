@@ -175,7 +175,7 @@ function buildTmasConfig(target, objectives) {
     ...(target.endpointType === 'custom' ? [
       `      reply: "{{response}}"`,
     ] : [
-      `      "choices[0].message.content": "{{response}}"`,
+      `      choices.0.message.content: "{{response}}"`,
     ]),
     `settings:`,
     `  concurrency: 5`,
