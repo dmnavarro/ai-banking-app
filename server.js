@@ -142,7 +142,7 @@ app.post('/api/scanner/run', async (req, res) => {
 
 // Serve the app at root
 app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'trend-bank.html'));
+  res.sendFile(path.join(__dirname, 'dgbank.html'));
 });
 
 const PORT = process.env.PORT || 3000;
