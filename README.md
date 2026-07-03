@@ -6,6 +6,27 @@ Built for Sales Engineers to deploy in their own AWS account and use during cust
 
 ---
 
+## Table of contents
+
+- [TrendAI product integrations](#trendai-product-integrations)
+- [What's in the demo](#whats-in-the-demo)
+- [Deploy](#deploy-fresh-account)
+  - [Prerequisites](#prerequisites)
+  - [One-command deploy](#one-command-deploy)
+  - [After deploy](#after-deploy)
+  - [Re-deploy / update](#re-deploy--update)
+  - [Script options](#script-options)
+- [Using the app](#using-the-app)
+  - [Banking Queries tab](#banking-queries-tab)
+  - [AI Guard](#ai-guard)
+  - [Malicious Prompts tab](#malicious-prompts-tab)
+  - [AI Scanner](#ai-scanner)
+- [Architecture](#architecture)
+- [GitHub Actions secrets](#github-actions-secrets)
+- [Local development](#local-development)
+
+---
+
 ## TrendAI product integrations
 
 | Product | Capability showcased |
@@ -189,7 +210,7 @@ Browser
 | Secret | Required | Description |
 |---|---|---|
 | `AWS_ROLE_ARN` | Yes | IAM role ARN printed by `deploy-ecs.sh` |
-| `TMAS_API_KEY` | No | TrendAI Vision One API key with **AI Application Security** scope — used in three ways: (1) enables the `tmas artifact scan` step in CI, (2) stored in AWS SSM and injected into ECS to power AI Scanner Live mode, and (3) used as the default API key for AI Guard live scanning (no manual key entry needed after deployment) |
+| `TMAS_API_KEY` | **Yes** | TrendAI Vision One API key with **AI Application Security** scope — used in three ways: (1) enables the `tmas artifact scan` step in CI, (2) stored in AWS SSM and injected into ECS to power AI Scanner Live mode, and (3) used as the default API key for AI Guard live scanning (no manual key entry needed after deployment) |
 
 > **Getting the Vision One API key:** in the Vision One console go to **Administration → API Keys** and create a key with the *AI Application Security* permission. This is a different key from standard Bedrock/AWS credentials. Set it as the `TMAS_API_KEY` GitHub Actions secret and the CI pipeline will push it to SSM automatically on the next run.
 
