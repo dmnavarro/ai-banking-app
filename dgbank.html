@@ -2485,29 +2485,13 @@ function addBlockedMsg(guardResult) {
   chatWin.classList.add('block-flash');
   setTimeout(() => chatWin.classList.remove('block-flash'), 950);
 
-  // "THREAT INTERCEPTED" banner — auto-dismisses after 3s
-  const banner = document.createElement('div');
-  banner.className = 'threat-banner';
-  const src = guardResult.source === 'live' ? 'TrendAI Vision One · Live' : guardResult.source === 'demo' ? 'AI Guard · Demo mode' : 'AI Guard · Pattern match';
-  banner.innerHTML = `
-    <div class="threat-banner-icon">🚨</div>
-    <div class="threat-banner-text">
-      <div class="threat-banner-title">THREAT INTERCEPTED</div>
-      <div class="threat-banner-sub">${src}</div>
-    </div>`;
-  msgs.appendChild(banner);
-  msgs.scrollTop = msgs.scrollHeight;
-  setTimeout(() => {
-    banner.style.animation = 'threatBannerOut .3s ease forwards';
-    setTimeout(() => banner.remove(), 320);
-  }, 3000);
-
   // Blocked message card
   const div = document.createElement('div');
   div.className = 'msg blocked';
   const reasons = (guardResult.reasons && guardResult.reasons.length)
     ? guardResult.reasons.map(r => `<li>${r}</li>`).join('')
     : '<li>Policy violation detected</li>';
+  const src = guardResult.source === 'live' ? 'TrendAI Vision One · Live' : guardResult.source === 'demo' ? 'AI Guard · Demo mode' : 'AI Guard · Pattern match';
   div.innerHTML = `
     <div class="bot-av-sm" style="background:linear-gradient(135deg,#991B1B,#C0394A)">🛡️</div>
     <div>
@@ -2520,7 +2504,22 @@ function addBlockedMsg(guardResult) {
       <div class="msg-time">${now12h()}</div>
     </div>`;
   msgs.appendChild(div);
+
+  // "THREAT INTERCEPTED" banner — appears below blocked card, auto-dismisses after 3s
+  const banner = document.createElement('div');
+  banner.className = 'threat-banner';
+  banner.innerHTML = `
+    <div class="threat-banner-icon">🚨</div>
+    <div class="threat-banner-text">
+      <div class="threat-banner-title">THREAT INTERCEPTED</div>
+      <div class="threat-banner-sub">${src}</div>
+    </div>`;
+  msgs.appendChild(banner);
   msgs.scrollTop = msgs.scrollHeight;
+  setTimeout(() => {
+    banner.style.animation = 'threatBannerOut .3s ease forwards';
+    setTimeout(() => banner.remove(), 320);
+  }, 3000);
 }
 
 function addScanningIndicator() {
