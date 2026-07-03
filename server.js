@@ -6,8 +6,8 @@ const app = express();
 app.use(express.json());
 app.use(express.static(__dirname));
 
-const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID || 'anthropic.claude-3-5-haiku-20241022-v1:0';
-const BEDROCK_REGION   = process.env.BEDROCK_REGION   || process.env.AWS_REGION || 'us-east-1';
+const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID || 'anthropic.claude-3-haiku-20240307-v1:0';
+const BEDROCK_REGION   = process.env.BEDROCK_REGION   || process.env.AWS_REGION || 'ap-southeast-1';
 
 const bedrockClient = new BedrockRuntimeClient({ region: BEDROCK_REGION });
 
