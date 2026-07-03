@@ -2224,8 +2224,8 @@ const MODIFIERS = [
   { id: 'best_of_n',  name: 'Best-of-N Scrambling', desc: 'Randomizes prompt phrasing across multiple attempts to find bypasses' },
 ];
 
-// Track selections (all objectives on, no techniques/modifiers by default — matches TMAS defaults)
-const selectedObjectives  = new Set(OBJECTIVES.map(o => o.id));
+// Track selections (first objective on by default)
+const selectedObjectives  = new Set([OBJECTIVES[0].id]);
 const selectedTechniques  = new Set();
 const selectedModifiers   = new Set();
 
