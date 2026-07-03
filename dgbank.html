@@ -120,6 +120,155 @@ nav ul li.active a, nav ul li a:hover { color: var(--navy); border-bottom-color:
 .chat-guard-pill.unconfigured .pill-configure { display: inline; }
 .pill-configure { display: none; font-size: .7rem; opacity: .75; margin-left: .2rem; }
 
+/* ── PAY BILLS PAGE ── */
+.paybills-page {
+  position: fixed; inset: 0; z-index: 1050;
+  background: var(--ground);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
+}
+.paybills-page.open { transform: translateX(0); }
+
+.paybills-nav {
+  background: var(--white); border-bottom: 1px solid var(--border);
+  height: 62px; display: flex; align-items: center;
+  padding: 0 2rem; gap: 1rem; flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(30,6,8,.05);
+}
+.paybills-nav-title { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 1.05rem; font-weight: bold; color: var(--navy); flex: 1; }
+.fss-badge {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: #EFF6FF; color: #1D4ED8;
+  border: 1px solid #BFDBFE; border-radius: 99px;
+  font-size: .72rem; font-weight: 700; padding: .25rem .75rem;
+  white-space: nowrap;
+}
+
+.paybills-body {
+  flex: 1; overflow-y: auto; padding: 2rem;
+  display: flex; flex-direction: column; align-items: center;
+}
+.paybills-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 16px; padding: 2rem;
+  width: 100%; max-width: 560px;
+  box-shadow: 0 2px 12px rgba(30,6,8,.06);
+}
+
+/* Storage / SDK mode toggle */
+.pb-mode-toggle {
+  display: flex; background: var(--sky);
+  border-radius: 10px; padding: 4px;
+  border: 1px solid var(--border);
+  margin-bottom: 1.75rem; width: 100%;
+}
+.pb-mode-btn {
+  flex: 1; padding: .45rem .75rem;
+  border-radius: 7px; border: none;
+  font-size: .82rem; font-weight: 600; cursor: pointer;
+  background: transparent; color: var(--steel);
+  transition: background .15s, color .15s;
+  text-align: center;
+}
+.pb-mode-btn.active { background: var(--navy); color: #fff; }
+
+/* Mode description */
+.pb-mode-desc {
+  font-size: .78rem; color: var(--steel);
+  background: var(--sky); border: 1px solid var(--border);
+  border-radius: 10px; padding: .75rem 1rem;
+  margin-bottom: 1.5rem; line-height: 1.5;
+}
+.pb-mode-desc strong { color: var(--navy); }
+
+/* Drop zone */
+.pb-dropzone {
+  border: 2px dashed var(--border); border-radius: 14px;
+  padding: 2.5rem 1.5rem; text-align: center;
+  cursor: pointer; transition: border-color .2s, background .2s;
+  background: var(--ground);
+}
+.pb-dropzone:hover, .pb-dropzone.drag-over {
+  border-color: var(--blue); background: var(--sky);
+}
+.pb-dropzone-icon { font-size: 2.2rem; margin-bottom: .75rem; }
+.pb-dropzone-title { font-size: .9rem; font-weight: 700; color: var(--navy); margin-bottom: .35rem; }
+.pb-dropzone-sub   { font-size: .72rem; color: var(--steel); }
+.pb-dropzone input[type=file] { display: none; }
+
+/* Progress section */
+.pb-progress { margin-top: 1.5rem; display: none; }
+.pb-progress.visible { display: block; }
+.pb-progress-file {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .75rem 1rem; background: var(--sky);
+  border-radius: 10px; margin-bottom: 1rem;
+  border: 1px solid var(--border);
+}
+.pb-progress-file-icon { font-size: 1.4rem; flex-shrink: 0; }
+.pb-progress-file-name { font-size: .82rem; font-weight: 600; color: var(--navy); flex: 1; word-break: break-all; }
+.pb-progress-file-size { font-size: .7rem; color: var(--steel); flex-shrink: 0; }
+.pb-progress-stage { font-size: .78rem; font-weight: 600; color: var(--navy); margin-bottom: .5rem; }
+.pb-progress-track {
+  height: 8px; background: var(--border);
+  border-radius: 99px; overflow: hidden; margin-bottom: .35rem;
+}
+.pb-progress-fill {
+  height: 100%; background: linear-gradient(90deg, var(--blue), #E05070);
+  border-radius: 99px;
+  transition: width .4s ease;
+}
+@keyframes pbScanPulse {
+  0%, 100% { width: 72%; opacity: 1; }
+  50%       { width: 89%; opacity: .85; }
+}
+.pb-progress-fill.scanning { animation: pbScanPulse 1.8s ease-in-out infinite; transition: none; }
+.pb-progress-pct { font-size: .68rem; color: var(--steel); text-align: right; }
+
+/* Result */
+.pb-result { margin-top: 1.5rem; display: none; }
+.pb-result.visible { display: block; }
+.pb-result-clean {
+  background: #ECFDF5; border: 1px solid #6EE7B7;
+  border-radius: 12px; padding: 1.25rem 1.5rem;
+  display: flex; align-items: center; gap: 1rem;
+}
+.pb-result-threat {
+  background: #FEF2F2; border: 1px solid #FECACA;
+  border-radius: 12px; padding: 1.25rem 1.5rem;
+  display: flex; align-items: center; gap: 1rem;
+}
+.pb-result-icon { font-size: 2rem; flex-shrink: 0; }
+.pb-result-title { font-size: .95rem; font-weight: 800; color: var(--navy); }
+.pb-result-sub   { font-size: .75rem; margin-top: .2rem; }
+.pb-result-clean  .pb-result-sub { color: #065F46; }
+.pb-result-threat .pb-result-sub { color: #991B1B; }
+.pb-result-actions { display: flex; gap: .65rem; margin-top: 1.25rem; }
+.pb-btn-primary {
+  padding: .6rem 1.25rem; background: var(--navy); color: #fff;
+  border: none; border-radius: 9px; font-size: .85rem; font-weight: 700;
+  cursor: pointer; transition: background .15s;
+}
+.pb-btn-primary:hover { background: var(--blue); }
+.pb-btn-ghost {
+  padding: .6rem 1.1rem; background: transparent; color: var(--navy);
+  border: 1.5px solid var(--border); border-radius: 9px;
+  font-size: .85rem; font-weight: 600; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.pb-btn-ghost:hover { border-color: var(--navy); background: var(--sky); }
+
+/* SDK coming soon notice */
+.pb-sdk-notice {
+  background: #FFF8EC; border: 1px solid #FDE68A;
+  border-radius: 10px; padding: 1rem 1.25rem;
+  font-size: .78rem; color: #92400E; line-height: 1.5;
+  margin-bottom: 1.5rem;
+}
+.pb-sdk-notice strong { color: #78350F; }
+
 /* Toast */
 .toast {
   position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
@@ -1348,6 +1497,76 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
   </div>
 </div>
 
+<!-- PAY BILLS PAGE -->
+<div class="paybills-page" id="payBillsPage">
+  <div class="paybills-nav">
+    <button class="scanner-back" onclick="closePayBills()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Dashboard
+    </button>
+    <div class="paybills-nav-title">Pay Bills</div>
+    <div class="fss-badge">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Vision One File Security
+    </div>
+  </div>
+
+  <div class="paybills-body">
+    <div class="paybills-card">
+
+      <!-- Storage / SDK toggle -->
+      <div class="pb-mode-toggle">
+        <button class="pb-mode-btn active" id="pbModeStorage" onclick="setPbMode('storage')">
+          ☁️ Storage
+        </button>
+        <button class="pb-mode-btn" id="pbModeSdk" onclick="setPbMode('sdk')">
+          ⚡ SDK
+        </button>
+      </div>
+
+      <!-- Mode description -->
+      <div class="pb-mode-desc" id="pbModeDesc">
+        <strong>Storage mode:</strong> Your bill document is uploaded to a secure S3 bucket monitored by <strong>Vision One File Security</strong>. The file is scanned before processing — malicious files are automatically quarantined and never reach the payment system.
+      </div>
+
+      <!-- SDK notice (hidden in storage mode) -->
+      <div class="pb-sdk-notice" id="pbSdkNotice" style="display:none">
+        <strong>SDK mode</strong> scans files inline on the server before they are stored anywhere, using the Vision One File Security SDK. This requires the SDK to be installed and a valid API key configured.<br><br>
+        To enable SDK mode, install the Trend Micro File Security SDK and set <code>FSS_API_KEY</code> in your environment. <strong>Storage mode is available now</strong> and provides equivalent protection via S3.
+      </div>
+
+      <!-- Drop zone -->
+      <div class="pb-dropzone" id="pbDropzone" onclick="document.getElementById('pbFileInput').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="event.preventDefault();this.classList.remove('drag-over');handlePbFiles(event.dataTransfer.files)">
+        <div class="pb-dropzone-icon">📄</div>
+        <div class="pb-dropzone-title">Drop your bill or invoice here</div>
+        <div class="pb-dropzone-sub">PDF, JPG, PNG, WEBP · max 10 MB · click to browse</div>
+        <input type="file" id="pbFileInput" accept=".pdf,image/*" onchange="handlePbFiles(this.files)">
+      </div>
+
+      <!-- Progress -->
+      <div class="pb-progress" id="pbProgress">
+        <div class="pb-progress-file">
+          <div class="pb-progress-file-icon" id="pbFileIcon">📄</div>
+          <div class="pb-progress-file-name" id="pbFileName">file.pdf</div>
+          <div class="pb-progress-file-size" id="pbFileSize"></div>
+        </div>
+        <div class="pb-progress-stage" id="pbStageLabel">Uploading…</div>
+        <div class="pb-progress-track">
+          <div class="pb-progress-fill" id="pbProgressFill" style="width:0%"></div>
+        </div>
+        <div class="pb-progress-pct" id="pbProgressPct">0%</div>
+      </div>
+
+      <!-- Result -->
+      <div class="pb-result" id="pbResult"></div>
+
+    </div>
+  </div>
+</div>
+
 <!-- AI SCANNER PAGE -->
 <div class="scanner-page" id="scannerPage">
 
@@ -1571,7 +1790,7 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
 
   <div class="section-title">Quick Actions</div>
   <div class="actions-row">
-    <button class="action-btn primary" onclick="showToast('Pay Bills — coming soon')">
+    <button class="action-btn primary" onclick="openPayBills()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
       Pay Bills
     </button>
@@ -2552,6 +2771,212 @@ function closeScannerPage() {
     const teasers = document.getElementById('chatTeasers');
     if (teasers) teasers.classList.remove('hidden');
   }
+}
+
+// ── PAY BILLS ──────────────────────────────────────────────────────────────
+
+let pbMode = 'storage';
+let pbPollTimer = null;
+
+function openPayBills() {
+  if (chatOpen) {
+    chatOpen = false;
+    document.getElementById('chatWindow').classList.add('hidden');
+  }
+  const teasers = document.getElementById('chatTeasers');
+  if (teasers) teasers.classList.add('hidden');
+  resetPbState();
+  document.getElementById('payBillsPage').classList.add('open');
+}
+
+function closePayBills() {
+  document.getElementById('payBillsPage').classList.remove('open');
+  if (!chatOpen) {
+    const teasers = document.getElementById('chatTeasers');
+    if (teasers) teasers.classList.remove('hidden');
+  }
+  if (pbPollTimer) { clearInterval(pbPollTimer); pbPollTimer = null; }
+}
+
+function setPbMode(mode) {
+  pbMode = mode;
+  document.getElementById('pbModeStorage').classList.toggle('active', mode === 'storage');
+  document.getElementById('pbModeSdk').classList.toggle('active', mode === 'sdk');
+  document.getElementById('pbModeDesc').style.display  = mode === 'storage' ? '' : 'none';
+  document.getElementById('pbSdkNotice').style.display = mode === 'sdk'     ? '' : 'none';
+  document.getElementById('pbDropzone').style.display  = mode === 'sdk'     ? 'none' : '';
+  resetPbState();
+}
+
+function resetPbState() {
+  document.getElementById('pbProgress').classList.remove('visible');
+  document.getElementById('pbResult').classList.remove('visible');
+  document.getElementById('pbResult').innerHTML = '';
+  document.getElementById('pbProgressFill').className = 'pb-progress-fill';
+  document.getElementById('pbProgressFill').style.width = '0%';
+  document.getElementById('pbFileInput').value = '';
+  if (pbPollTimer) { clearInterval(pbPollTimer); pbPollTimer = null; }
+}
+
+function pbFileIcon(type) {
+  if (type === 'application/pdf')      return '📄';
+  if (type.startsWith('image/'))       return '🖼️';
+  return '📎';
+}
+
+function pbFormatSize(bytes) {
+  if (bytes < 1024)       return bytes + ' B';
+  if (bytes < 1024*1024)  return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+
+function handlePbFiles(files) {
+  if (!files || !files.length) return;
+  const file = files[0];
+
+  const allowed = ['image/jpeg','image/png','image/webp','image/gif','application/pdf'];
+  if (!allowed.includes(file.type)) {
+    showToast('Only PDF and image files are accepted.');
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    showToast('File exceeds 10 MB limit.');
+    return;
+  }
+
+  // Show progress panel
+  document.getElementById('pbFileIcon').textContent  = pbFileIcon(file.type);
+  document.getElementById('pbFileName').textContent  = file.name;
+  document.getElementById('pbFileSize').textContent  = pbFormatSize(file.size);
+  document.getElementById('pbProgress').classList.add('visible');
+  document.getElementById('pbResult').classList.remove('visible');
+  document.getElementById('pbResult').innerHTML = '';
+  setPbStage('Requesting secure upload URL…', 5);
+
+  if (pbMode === 'storage') {
+    pbUploadStorage(file);
+  }
+}
+
+function setPbStage(label, pct, scanning = false) {
+  document.getElementById('pbStageLabel').textContent  = label;
+  document.getElementById('pbProgressPct').textContent = Math.round(pct) + '%';
+  const fill = document.getElementById('pbProgressFill');
+  fill.className = 'pb-progress-fill' + (scanning ? ' scanning' : '');
+  if (!scanning) fill.style.width = pct + '%';
+}
+
+async function pbUploadStorage(file) {
+  try {
+    // 1. Get presigned URL from server
+    const urlResp = await fetch('/api/bills/presigned-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }),
+    });
+    if (!urlResp.ok) {
+      const err = await urlResp.json();
+      return pbShowError(err.error || 'Could not get upload URL.');
+    }
+    const { uploadUrl, key } = await urlResp.json();
+
+    // 2. Upload directly to S3 with XHR (for progress events)
+    setPbStage('Uploading to secure bucket…', 10);
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', uploadUrl);
+      xhr.setRequestHeader('Content-Type', file.type);
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) {
+          const pct = 10 + (e.loaded / e.total) * 55; // 10% → 65%
+          setPbStage('Uploading to secure bucket…', pct);
+        }
+      };
+      xhr.onload  = () => xhr.status < 300 ? resolve() : reject(new Error('Upload failed: ' + xhr.status));
+      xhr.onerror = () => reject(new Error('Network error during upload.'));
+      xhr.send(file);
+    });
+
+    // 3. Poll for scan result
+    setPbStage('Vision One File Security scanning…', 70, true);
+    pbPollScanResult(key);
+
+  } catch (e) {
+    pbShowError(e.message);
+  }
+}
+
+function pbPollScanResult(key) {
+  let attempts = 0;
+  const MAX_ATTEMPTS = 60; // 2 minutes max
+
+  pbPollTimer = setInterval(async () => {
+    attempts++;
+    if (attempts > MAX_ATTEMPTS) {
+      clearInterval(pbPollTimer); pbPollTimer = null;
+      pbShowError('Scan timed out. The file may still be processing in Vision One.');
+      return;
+    }
+    try {
+      const resp = await fetch('/api/bills/scan-result?key=' + encodeURIComponent(key));
+      const data = await resp.json();
+      if (data.status === 'pending') return; // keep polling
+      clearInterval(pbPollTimer); pbPollTimer = null;
+      setPbStage('Scan complete', 100);
+      if (data.status === 'clean') {
+        pbShowClean(key);
+      } else {
+        pbShowThreat(data.threat || 'Threat detected');
+      }
+    } catch { /* network hiccup — keep trying */ }
+  }, 2000);
+}
+
+function pbShowClean(key) {
+  document.getElementById('pbResult').innerHTML = `
+    <div class="pb-result-clean">
+      <div class="pb-result-icon">✅</div>
+      <div>
+        <div class="pb-result-title">File cleared — no threats found</div>
+        <div class="pb-result-sub">Vision One File Security scanned this file and found no issues. Your bill has been accepted for processing.</div>
+      </div>
+    </div>
+    <div class="pb-result-actions">
+      <button class="pb-btn-primary" onclick="showToast('Payment submitted successfully!')">Submit Payment</button>
+      <button class="pb-btn-ghost" onclick="resetPbState()">Upload Another</button>
+    </div>`;
+  document.getElementById('pbResult').classList.add('visible');
+}
+
+function pbShowThreat(threat) {
+  document.getElementById('pbResult').innerHTML = `
+    <div class="pb-result-threat">
+      <div class="pb-result-icon">🚨</div>
+      <div>
+        <div class="pb-result-title">Threat detected — file quarantined</div>
+        <div class="pb-result-sub">Vision One File Security identified <strong>${threat}</strong> in this file. It has been quarantined and blocked from the payment system.</div>
+      </div>
+    </div>
+    <div class="pb-result-actions">
+      <button class="pb-btn-ghost" onclick="resetPbState()">Try a Different File</button>
+    </div>`;
+  document.getElementById('pbResult').classList.add('visible');
+}
+
+function pbShowError(msg) {
+  document.getElementById('pbResult').innerHTML = `
+    <div class="pb-result-threat">
+      <div class="pb-result-icon">⚠️</div>
+      <div>
+        <div class="pb-result-title">Upload failed</div>
+        <div class="pb-result-sub">${msg}</div>
+      </div>
+    </div>
+    <div class="pb-result-actions">
+      <button class="pb-btn-ghost" onclick="resetPbState()">Try Again</button>
+    </div>`;
+  document.getElementById('pbResult').classList.add('visible');
+  document.getElementById('pbProgress').classList.remove('visible');
 }
 
 let endpointFormat = 'custom';

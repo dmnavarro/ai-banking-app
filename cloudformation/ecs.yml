@@ -254,6 +254,23 @@ Resources:
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-haiku*"
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-haiku*"
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-sonnet*"
+        - PolicyName: dgbank-ai-app-demo-filescan-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: FileScanS3Access
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:GetObjectTagging
+                Resource: !Sub "arn:aws:s3:::dg-bank-scanning-${AWS::AccountId}-${AWS::Region}/*"
+              - Sid: FileScanS3List
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub "arn:aws:s3:::dg-bank-scanning-${AWS::AccountId}-${AWS::Region}"
 
   # ---------------------------------------------------------------------------
   # IAM — EC2 Instance Role (ECS agent + ECR + SSM)
@@ -355,6 +372,10 @@ Resources:
               Value: !Ref BedrockRegion
             - Name: BEDROCK_MODEL_ID
               Value: !Ref BedrockModelId
+            - Name: FILESCAN_BUCKET
+              Value: !Sub "dg-bank-scanning-${AWS::AccountId}-${AWS::Region}"
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
           Secrets:
             - Name: TMAS_API_KEY
               ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/tmas-api-key"

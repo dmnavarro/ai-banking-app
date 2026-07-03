@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  DG Bank — Vision One File Security S3 buckets.
+  Creates a scanning bucket (where uploads land for scanning) and a quarantine
+  bucket (where File Security moves malicious files). Also creates an IAM
+  managed policy that grants the ECS task role the minimum S3 permissions needed.
+
+Resources:
+
+  # ---------------------------------------------------------------------------
+  # S3 — Scanning bucket
+  # Files uploaded by the Pay Bills UI land here. Vision One File Security
+  # monitors this bucket and tags each object with the scan result.
+  # ---------------------------------------------------------------------------
+  ScanningBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "dg-bank-scanning-${AWS::AccountId}-${AWS::Region}"
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [PUT, HEAD]
+            AllowedOrigins: ["*"]
+            ExposedHeaders: [ETag]
+            MaxAge: 3600
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteAfter7Days
+            Status: Enabled
+            ExpirationInDays: 7
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # ---------------------------------------------------------------------------
+  # S3 — Quarantine bucket
+  # Vision One File Security moves malicious files here automatically.
+  # No public access; lifecycle deletes after 30 days.
+  # ---------------------------------------------------------------------------
+  QuarantineBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "dg-bank-quarantine-${AWS::AccountId}-${AWS::Region}"
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteAfter30Days
+            Status: Enabled
+            ExpirationInDays: 30
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # ---------------------------------------------------------------------------
+  # IAM — Managed policy for the ECS task role
+  # Attach this to dgbank-ai-app-demo-ecs-task-role after deploying this stack.
+  # The deploy-filesecurity.sh script does the attachment automatically.
+  # ---------------------------------------------------------------------------
+  FileScanS3Policy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "dg-bank-filescan-s3-policy"
+      Description: Allows ECS task to generate presigned URLs and poll scan tags for File Security
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: GeneratePresignedUrls
+            Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:DeleteObject
+            Resource: !Sub "${ScanningBucket.Arn}/*"
+          - Sid: PollScanTags
+            Effect: Allow
+            Action:
+              - s3:GetObjectTagging
+            Resource:
+              - !Sub "${ScanningBucket.Arn}/*"
+              - !Sub "${QuarantineBucket.Arn}/*"
+          - Sid: ListBucket
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - !GetAtt ScanningBucket.Arn
+              - !GetAtt QuarantineBucket.Arn
+
+Outputs:
+
+  ScanningBucketName:
+    Description: Name of the scanning bucket — set this as FILESCAN_BUCKET env var on the ECS task
+    Value: !Ref ScanningBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-ScanningBucket"
+
+  QuarantineBucketName:
+    Description: Name of the quarantine bucket — configure this in Vision One File Security
+    Value: !Ref QuarantineBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-QuarantineBucket"
+
+  FileScanPolicyArn:
+    Description: ARN of the IAM policy — attach this to the ECS task role
+    Value: !Ref FileScanS3Policy
+    Export:
+      Name: !Sub "${AWS::StackName}-FileScanPolicyArn"

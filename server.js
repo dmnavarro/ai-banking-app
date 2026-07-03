@@ -1,6 +1,8 @@
 const express = require('express');
 const path    = require('path');
 const { BedrockRuntimeClient, ConverseCommand } = require('@aws-sdk/client-bedrock-runtime');
+const { S3Client, GetObjectTaggingCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const app = express();
 app.use(express.json());
@@ -8,8 +10,11 @@ app.use(express.static(__dirname));
 
 const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID || 'anthropic.claude-3-haiku-20240307-v1:0';
 const BEDROCK_REGION   = process.env.BEDROCK_REGION   || process.env.AWS_REGION || 'ap-southeast-1';
+const FILESCAN_BUCKET  = (process.env.FILESCAN_BUCKET || '').trim();
+const S3_REGION        = process.env.AWS_REGION || BEDROCK_REGION;
 
 const bedrockClient = new BedrockRuntimeClient({ region: BEDROCK_REGION });
+const s3Client      = new S3Client({ region: S3_REGION });
 
 const SYSTEM_PROMPT = `You are C-3PO, a friendly and professional AI banking assistant for DG Bank.
 You help customers with account inquiries, fund transfers, card management, loan questions, and general banking support.
@@ -327,6 +332,63 @@ app.get('/api/scanner/tmas/events/:jobId', (req, res) => {
     clearInterval(heartbeat);
     job.emitter.off('event', send);
   });
+});
+
+// ---------------------------------------------------------------------------
+// File Security — Pay Bills upload (Storage mode)
+// ---------------------------------------------------------------------------
+const ALLOWED_TYPES = new Set(['image/jpeg','image/png','image/webp','image/gif','application/pdf']);
+const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+// Generate a presigned PUT URL so the browser uploads directly to S3
+app.post('/api/bills/presigned-url', async (req, res) => {
+  if (!FILESCAN_BUCKET) {
+    return res.status(503).json({ error: 'File Security bucket not configured on this server.' });
+  }
+  const { filename, contentType, size } = req.body || {};
+  if (!filename || !contentType) return res.status(400).json({ error: 'filename and contentType are required' });
+  if (!ALLOWED_TYPES.has(contentType)) return res.status(400).json({ error: 'Only PDF and image files are accepted.' });
+  if (size && size > MAX_SIZE_BYTES) return res.status(400).json({ error: 'File exceeds 10 MB limit.' });
+
+  const key = `uploads/${Date.now()}-${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  try {
+    const command = new PutObjectCommand({
+      Bucket: FILESCAN_BUCKET,
+      Key: key,
+      ContentType: contentType,
+    });
+    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+    console.log(`[FileScan] presigned PUT generated key=${key}`);
+    res.json({ uploadUrl, key });
+  } catch (e) {
+    console.error('[FileScan] presigned URL error:', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// Poll S3 object tags for the Vision One File Security scan result
+// Vision One writes: fss-scanned=true and fss-scan-result=no issues found|malware|error
+app.get('/api/bills/scan-result', async (req, res) => {
+  const { key } = req.query;
+  if (!key || !FILESCAN_BUCKET) return res.status(400).json({ error: 'key is required' });
+  try {
+    const command = new GetObjectTaggingCommand({ Bucket: FILESCAN_BUCKET, Key: key });
+    const data = await s3Client.send(command);
+    const tags = Object.fromEntries((data.TagSet || []).map(t => [t.Key, t.Value]));
+    console.log(`[FileScan] tags for ${key}:`, tags);
+
+    if (tags['fss-scanned'] !== 'true') {
+      return res.json({ status: 'pending' });
+    }
+    const result = (tags['fss-scan-result'] || '').toLowerCase();
+    if (result === 'no issues found') {
+      return res.json({ status: 'clean', tags });
+    }
+    return res.json({ status: 'threat', threat: tags['fss-scan-result'], tags });
+  } catch (e) {
+    console.error('[FileScan] tag poll error:', e.message);
+    res.status(502).json({ error: e.message });
+  }
 });
 
 // Serve the app at root
