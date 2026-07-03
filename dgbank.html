@@ -428,7 +428,7 @@ nav ul li.active a, nav ul li a:hover { color: var(--navy); border-bottom-color:
 .chat-teasers { display: flex; flex-direction: column; gap: .5rem; align-items: flex-end; transition: opacity .2s, transform .2s; }
 .chat-teasers.hidden { opacity: 0; pointer-events: none; transform: translateY(6px); }
 .chat-teaser-float {
-  width: 280px;
+  width: 460px;
   padding: .65rem .85rem;
   border-radius: 12px;
   display: flex; align-items: center; gap: .65rem;
@@ -1282,8 +1282,8 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
       <label style="display:flex;align-items:flex-start;gap:.65rem;cursor:pointer;">
         <input type="checkbox" id="demoMode" style="accent-color:var(--blue);margin-top:.15rem;flex-shrink:0;">
         <div>
-          <div style="font-size:.82rem;font-weight:700;color:var(--navy)">Demo Mode</div>
-          <div style="font-size:.7rem;color:var(--steel);margin-top:.15rem">Simulate AI Guard responses locally without a real API call. Useful for presentations when a live key isn't available. Threat presets will still appear blocked.</div>
+          <div style="font-size:.82rem;font-weight:700;color:var(--navy)">Force Demo Mode</div>
+          <div style="font-size:.7rem;color:var(--steel);margin-top:.15rem">Skip the live API and use local pattern matching only. Use this when presenting offline or when connectivity is unavailable. Guard On will still show in the pill but responses come from built-in patterns.</div>
         </div>
       </label>
     </div>
@@ -1762,7 +1762,12 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
 let serverHasDefaultKey = false;
 fetch('/api/config').then(r => r.json()).then(cfg => {
   serverHasDefaultKey = !!cfg.hasDefaultApiKey;
+  // Auto-enable Guard On if a key is available and user has no saved preference
+  if (serverHasDefaultKey && localStorage.getItem('guard_enabled') === null) {
+    localStorage.setItem('guard_enabled', 'true');
+  }
   refreshStatusCard();
+  updateGuardPill();
 }).catch(() => {});
 
 const REGIONS = {
@@ -1776,9 +1781,16 @@ const REGIONS = {
 };
 
 function openSettings() {
+  // Close chat window if open
+  if (chatOpen) {
+    chatOpen = false;
+    document.getElementById('chatWindow').classList.add('hidden');
+  }
   document.getElementById('settingsOverlay').classList.add('open');
   document.getElementById('settingsDrawer').classList.add('open');
   document.getElementById('settingsBtn').classList.add('active');
+  const teasers = document.getElementById('chatTeasers');
+  if (teasers) teasers.classList.add('hidden');
   loadSettingsUI();
 }
 
@@ -1786,6 +1798,10 @@ function closeSettings() {
   document.getElementById('settingsOverlay').classList.remove('open');
   document.getElementById('settingsDrawer').classList.remove('open');
   document.getElementById('settingsBtn').classList.remove('active');
+  if (!chatOpen) {
+    const teasers = document.getElementById('chatTeasers');
+    if (teasers) teasers.classList.remove('hidden');
+  }
 }
 
 function loadSettingsUI() {
@@ -1842,9 +1858,9 @@ function saveSettings() {
   updateGuardPill();
   closeSettings();
 
-  addSystemMsg(demo
-    ? '⚙️ AI Guard enabled in Demo Mode. Threat presets will be simulated as blocked.'
-    : (apiKey || serverHasDefaultKey ? '⚙️ AI Guard configured and active. All messages will be scanned.' : '⚙️ Settings saved. Add an API key to enable live scanning.'));
+  addSystemMsg(apiKey || serverHasDefaultKey
+    ? '⚙️ Settings saved. AI Guard is active — live scanning with demo fallback on connectivity issues.'
+    : '⚙️ Settings saved. Add an API key to enable live scanning.');
 }
 
 function refreshStatusCard() {
@@ -1852,10 +1868,7 @@ function refreshStatusCard() {
   const apiKey = document.getElementById('apiKeyInput').value.trim();
   const demo   = document.getElementById('demoMode').checked;
   card.className = 'guard-status-card';
-  if (demo) {
-    card.classList.add('configured');
-    card.innerHTML = '<span class="status-icon">🟢</span><div><div style="font-weight:700;font-size:.8rem">Demo Mode Active</div><div style="font-size:.7rem;margin-top:.15rem">Threat scenarios will be simulated as blocked by AI Guard.</div></div>';
-  } else if (apiKey || serverHasDefaultKey) {
+  if (apiKey || serverHasDefaultKey) {
     const region = document.getElementById('regionSelect').value;
     const keyLabel = apiKey ? 'Custom key set' : 'Server default key';
     card.classList.add('configured');
@@ -1895,59 +1908,51 @@ async function testConnection() {
 
 const SHIELD = '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>';
 
-// guard_mode: 'demo' | 'live' | 'off'
-function getGuardMode() {
-  return localStorage.getItem('guard_mode') || 'off';
+// Guard state: on/off only. Demo is a forced fallback via settings checkbox, not a pill state.
+function isGuardOn() {
+  const saved = localStorage.getItem('guard_enabled');
+  if (saved !== null) return saved === 'true';
+  // Default: on if any key is available
+  return serverHasDefaultKey || !!localStorage.getItem('visionone_api_key');
 }
 
 function toggleGuard() {
-  const apiKey = localStorage.getItem('visionone_api_key');
-  const demo   = localStorage.getItem('visionone_demo') === 'true';
-  if (!apiKey && !demo) return;
-
-  const current = getGuardMode();
-  let next;
-  if (apiKey && demo) {
-    // All three states available: demo → live → off → demo
-    next = current === 'demo' ? 'live' : current === 'live' ? 'off' : 'demo';
-  } else if (demo) {
-    // Only demo available: demo ↔ off
-    next = current === 'demo' ? 'off' : 'demo';
-  } else {
-    // Only live available: live ↔ off
-    next = current === 'live' ? 'off' : 'live';
-  }
-
-  localStorage.setItem('guard_mode', next);
+  const hasKey = serverHasDefaultKey || !!localStorage.getItem('visionone_api_key');
+  if (!hasKey) return;
+  localStorage.setItem('guard_enabled', !isGuardOn());
   updateGuardPill();
 }
 
 function updateGuardPill() {
   const pill   = document.getElementById('guardPill');
-  const apiKey = localStorage.getItem('visionone_api_key');
-  const demo   = localStorage.getItem('visionone_demo') === 'true';
   const dot    = document.getElementById('guardConfiguredDot');
-  const configured = apiKey || demo;
-  const mode   = getGuardMode();
+  const hasKey = serverHasDefaultKey || !!localStorage.getItem('visionone_api_key');
+  const on     = isGuardOn();
 
   pill.className = 'chat-guard-pill';
-  pill.onclick   = configured ? toggleGuard : null;
 
-  if (!configured || mode === 'off') {
-    pill.classList.add(configured ? 'disabled' : 'unconfigured');
-    pill.innerHTML = `${SHIELD} Guard Off`;
-    pill.title = configured ? 'Click to enable AI Guard' : 'Configure AI Guard in settings';
-    dot.classList.remove('show');
-  } else if (mode === 'demo') {
-    pill.classList.add('active');
-    pill.innerHTML = `${SHIELD} Demo`;
-    pill.title = 'Click to switch mode';
+  if (scanning) {
+    pill.classList.add('scanning');
+    pill.innerHTML = '<div class="scan-spin" style="border-color:rgba(251,196,74,.4);border-top-color:#FBC44A"></div> Scanning…';
+    pill.onclick = null;
     dot.classList.add('show');
-  } else {
+    return;
+  }
+
+  if (on) {
     pill.classList.add('active');
     pill.innerHTML = `${SHIELD} Guard On`;
-    pill.title = 'Click to switch mode';
+    pill.title = 'Click to turn Guard Off';
+    pill.onclick = toggleGuard;
     dot.classList.add('show');
+  } else {
+    pill.classList.add(hasKey ? 'disabled' : 'unconfigured');
+    pill.innerHTML = hasKey
+      ? `${SHIELD} Guard Off`
+      : `${SHIELD} Guard Off<span class="pill-configure" onclick="event.stopPropagation();openSettings()"> · Configure →</span>`;
+    pill.title = hasKey ? 'Click to turn Guard On' : 'Configure AI Guard in settings';
+    pill.onclick = hasKey ? toggleGuard : null;
+    dot.classList.remove('show');
   }
 }
 
@@ -1972,31 +1977,31 @@ function detectThreat(text) {
 }
 
 // ── VISION ONE AI GUARD API ──
+function demoFallback(prompt) {
+  const threat = detectThreat(prompt);
+  return threat
+    ? { blocked: true,  source: 'fallback', reasons: [threat.type], details: threat.detail }
+    : { blocked: false, source: 'fallback' };
+}
+
 async function callAIGuard(prompt) {
-  const apiKey   = localStorage.getItem('visionone_api_key');
-  const region   = localStorage.getItem('visionone_region') || 'us';
-  const endpoint = localStorage.getItem('visionone_endpoint') || '/v3.0/aiSecurity/applyGuardrails';
-  const guardId  = localStorage.getItem('visionone_guard_id') || '';
-  const mode     = getGuardMode();
+  // Guard off: skip scanning entirely
+  if (!isGuardOn()) return { blocked: false, source: 'off' };
 
-  // Guard off: skip scanning
-  if (mode === 'off') return { blocked: false, source: 'unconfigured' };
-
-  // Demo mode: pattern match locally
-  if (mode === 'demo') {
+  // Demo forced via settings checkbox: pattern match only, no API call
+  if (localStorage.getItem('visionone_demo') === 'true') {
     await new Promise(r => setTimeout(r, 600 + Math.random()*400));
     const threat = detectThreat(prompt);
-    if (threat) {
-      return { blocked: true, source: 'demo', reasons: [threat.type], details: threat.detail };
-    }
-    return { blocked: false, source: 'demo' };
+    return threat
+      ? { blocked: true,  source: 'demo', reasons: [threat.type], details: threat.detail }
+      : { blocked: false, source: 'demo' };
   }
 
-  // Live mode but no key at all (neither user nor server default)
-  if (!apiKey && !serverHasDefaultKey) return { blocked: false, source: 'unconfigured' };
+  // Live API — fall back to demo pattern matching on any error
+  const apiKey  = localStorage.getItem('visionone_api_key');
+  const region  = localStorage.getItem('visionone_region') || 'sg';
+  const guardId = localStorage.getItem('visionone_guard_id') || '';
 
-  // Live API call — proxy forwards Authorization header to Vision One (bypasses CORS)
-  // If no user key, server falls back to its own TMAS_API_KEY
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
@@ -2010,32 +2015,28 @@ async function callAIGuard(prompt) {
     if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
 
     const resp = await fetch('/api/aiguard/scan', {
-      method: 'POST',
-      headers,
+      method: 'POST', headers,
       body: JSON.stringify({ prompt }),
       signal: controller.signal,
     }).finally(() => clearTimeout(timeout));
 
     const text = await resp.text();
-    console.log('AI Guard raw response (' + resp.status + '):', text);
+    console.log('[AI Guard]', resp.status, text.slice(0, 200));
 
     let data;
     try { data = JSON.parse(text); } catch(_) { data = {}; }
 
     if (!resp.ok) {
-      const msg = data?.error?.message || data?.error || ('HTTP ' + resp.status);
-      return { blocked: false, source: 'error', error: String(msg) };
+      console.warn('[AI Guard] API error', resp.status, '— falling back to demo');
+      return demoFallback(prompt);
     }
 
-    // Vision One applyGuardrails returns: { action: "Allow"|"Block", reasons: [...], promptAttacks: [...] }
     const blocked = data.action === 'Block';
-    const reasons = data.reasons || [];
-    return { blocked, source: 'live', reasons, raw: data };
+    return { blocked, source: 'live', reasons: data.reasons || [], raw: data };
 
   } catch (e) {
-    const msg = e.name === 'AbortError' ? 'Request timed out (12 s)' : e.message;
-    console.warn('AI Guard proxy error:', msg);
-    return { blocked: false, source: 'error', error: msg };
+    console.warn('[AI Guard] Connection error:', e.message, '— falling back to demo');
+    return demoFallback(prompt);
   }
 }
 
@@ -2119,9 +2120,9 @@ function addBotMsg(text, guardResult) {
   let badge = '';
   if (guardResult) {
     if (guardResult.source === 'live')          badge = '<div><span class="guard-badge cleared">🛡️ AI Guard · Cleared</span></div>';
-    else if (guardResult.source === 'demo')     badge = '<div><span class="guard-badge cleared">🛡️ AI Guard · Cleared (demo)</span></div>';
-    else if (guardResult.source === 'error')    badge = `<div><span class="guard-badge demo" title="${guardResult.error || ''}">⚠️ AI Guard · ${guardResult.error || 'error'}</span></div>`;
-    else if (guardResult.source === 'unconfigured') badge = '<div><span class="guard-badge unconfigured">🛡️ AI Guard · Not configured</span></div>';
+    else if (guardResult.source === 'demo')     badge = '<div><span class="guard-badge demo">🛡️ AI Guard · Demo mode</span></div>';
+    else if (guardResult.source === 'fallback') badge = '<div><span class="guard-badge demo" title="Live API unavailable — using pattern matching">🛡️ AI Guard · Demo fallback</span></div>';
+    else if (guardResult.source === 'off')      badge = '<div><span class="guard-badge unconfigured">🛡️ AI Guard · Off</span></div>';
   }
 
   div.innerHTML = `
@@ -2144,7 +2145,7 @@ function addBlockedMsg(guardResult) {
     ? guardResult.reasons.map(r => `<li>${r}</li>`).join('')
     : '<li>Policy violation detected</li>';
 
-  const src = guardResult.source === 'demo' ? ' (demo)' : guardResult.source === 'live' ? ' (live)' : '';
+  const src = guardResult.source === 'demo' ? ' (demo)' : guardResult.source === 'fallback' ? ' (demo fallback)' : guardResult.source === 'live' ? ' (live)' : '';
 
   div.innerHTML = `
     <div class="bot-av-sm" style="background:linear-gradient(135deg,#991B1B,#C0394A)">🛡️</div>
@@ -2244,15 +2245,12 @@ async function sendMessage() {
   addUserMsg(text);
   scanning = true;
 
-  const apiKey = localStorage.getItem('visionone_api_key');
-  const demo   = localStorage.getItem('visionone_demo') === 'true';
-  const hasGuard = getGuardMode() !== 'off';
+  const hasGuard = isGuardOn();
 
   // Set scanning state in header pill
   if (hasGuard) {
-    const pill = document.getElementById('guardPill');
-    pill.className = 'chat-guard-pill scanning';
-    pill.innerHTML = '<div class="scan-spin" style="border-color:rgba(251,196,74,.4);border-top-color:#FBC44A"></div> Scanning…';
+    scanning = true;
+    updateGuardPill();
     document.getElementById('chatStatus').textContent = 'Scanning with AI Guard…';
     addScanningIndicator();
   }
@@ -2393,6 +2391,8 @@ const selectedModifiers   = new Set();
 
 function openScannerPage() {
   document.getElementById('scannerPage').classList.add('open');
+  const teasers = document.getElementById('chatTeasers');
+  if (teasers) teasers.classList.add('hidden');
   const apiKey = localStorage.getItem('visionone_api_key');
   const demo   = localStorage.getItem('visionone_demo') === 'true';
   setScannerMode((demo || !apiKey) ? 'demo' : 'live');
@@ -2402,6 +2402,10 @@ function openScannerPage() {
 
 function closeScannerPage() {
   document.getElementById('scannerPage').classList.remove('open');
+  if (!chatOpen) {
+    const teasers = document.getElementById('chatTeasers');
+    if (teasers) teasers.classList.remove('hidden');
+  }
 }
 
 let endpointFormat = 'custom';
