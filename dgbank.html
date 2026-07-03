@@ -865,7 +865,7 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
 /* Step 3 — scanning state */
 .sc-campaign-scanning {
   display: flex; flex-direction: column; align-items: center;
-  text-align: center; padding: 3rem 2rem;
+  text-align: center; padding: 2rem 1rem;
 }
 .sc-scanning-anim {
   position: relative; width: 100px; height: 100px;
@@ -888,11 +888,14 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
 
 /* Terminal log */
 .sc-terminal {
-  width: 100%; max-width: 580px; background: #0F172A;
+  width: 100%; background: #0F172A;
   border-radius: 12px; padding: 1rem 1.25rem;
   font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
   font-size: .76rem; line-height: 1.8; text-align: left;
-  max-height: 280px; overflow-y: auto;
+  height: 420px; overflow-y: auto; box-sizing: border-box;
+}
+@media (max-width: 600px) {
+  .sc-terminal { height: 55vw; min-height: 200px; }
 }
 .sc-log-line { display: block; }
 .sc-log-line.green { color: #4ADE80; }
@@ -977,6 +980,14 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
 
 /* ── MOBILE ── */
 @media (max-width: 540px) {
+  /* Scanner nav */
+  .scanner-nav { padding: 0 .75rem; gap: .5rem; height: 56px; }
+  .scanner-back { padding: .35rem .55rem; font-size: .75rem; }
+  .scanner-title-wrap { min-width: 0; }
+  .scanner-nav-title { font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scanner-nav-sub { display: none; }
+  .smode-btn { padding: .3rem .6rem; font-size: .72rem; }
+
   /* Nav */
   nav { padding: 0 1rem; height: 56px; }
   .logo-word { font-size: 1.1rem; }
@@ -1557,7 +1568,7 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
     <!-- Messages -->
     <div class="chat-messages" id="chatMessages">
       <div class="msg bot">
-        <div class="bot-av-sm">T</div>
+        <div class="bot-av-sm">C</div>
         <div>
           <div class="msg-bubble">Hi Anakin! 👋 I'm C-3PO, your DG Bank assistant. I can help with transfers, account questions, card management, and more.<br><br>Use the tabs above to pick a query or type your own. AI Guard will scan each message if configured.</div>
           <div class="msg-time">Just now</div>
@@ -1970,7 +1981,7 @@ function addBotMsg(text, guardResult) {
   }
 
   div.innerHTML = `
-    <div class="bot-av-sm">T</div>
+    <div class="bot-av-sm">C</div>
     <div>
       <div class="msg-bubble">${text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}</div>
       ${badge}
@@ -2011,7 +2022,7 @@ function addScanningIndicator() {
   const div = document.createElement('div');
   div.className = 'msg bot'; div.id = 'scanningMsg';
   div.innerHTML = `
-    <div class="bot-av-sm">T</div>
+    <div class="bot-av-sm">C</div>
     <div class="scanning-indicator">
       <div class="scan-spin"></div>
       Scanning with AI Guard…
@@ -2030,7 +2041,7 @@ function addTypingIndicator() {
   const div = document.createElement('div');
   div.className = 'msg bot'; div.id = 'typingMsg';
   div.innerHTML = `
-    <div class="bot-av-sm">T</div>
+    <div class="bot-av-sm">C</div>
     <div class="typing-indicator">
       <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
     </div>`;
@@ -2296,7 +2307,10 @@ function toggleResultRow(id) {
 }
 
 // ── Terminal log helpers ──
+let scanLog = [];
+
 function addLogLine(text, cls = 'white') {
+  scanLog.push(text);
   const terminal = document.getElementById('scTerminal');
   if (!terminal) return;
   const span = document.createElement('span');
@@ -2355,6 +2369,7 @@ async function runScan() {
   document.getElementById('scCampaignScanning').style.display = '';
   document.getElementById('scResultsDisplay').style.display = 'none';
   document.getElementById('scTerminal').innerHTML = '';
+  scanLog = [];
 
   const targetLabel = document.getElementById('scTargetLabel').value.trim() || 'Target Endpoint';
   const targetUrl   = document.getElementById('scTargetUrl').value.trim();
@@ -2412,7 +2427,7 @@ async function runDemoScan(active, targetLabel) {
     await delay(200);
   }
 
-  lastResults = { results, mode: 'demo', targetLabel };
+  lastResults = { results, mode: 'demo', targetLabel, log: [...scanLog] };
 }
 
 // TMAS-supported objective name mapping
@@ -2534,7 +2549,7 @@ async function runLiveScan(active, targetLabel, targetUrl) {
       score: `${blocked}/${total}`, techniques });
   }
 
-  lastResults = { results, mode: 'live', targetLabel };
+  lastResults = { results, mode: 'live', targetLabel, log: [...scanLog] };
 }
 
 // Parse TMAS results.json → frontend results shape.
@@ -2651,7 +2666,7 @@ function renderResults(data) {
 
 function exportReport() {
   if (!lastResults) return;
-  const { results, targetLabel } = lastResults;
+  const { results, targetLabel, log } = lastResults;
   const now = new Date().toISOString();
 
   const totalTech   = results.reduce((s, r) => s + r.techniques.length, 0);
@@ -2665,13 +2680,21 @@ function exportReport() {
     `Date:      ${now}`,
     `Summary:   ${blockedTech}/${totalTech} techniques blocked, ${vulns} vulnerabilities found`,
     '',
+    'Results by Objective',
+    '---------------------------------',
   ];
 
   for (const r of results) {
-    lines.push(`[${r.status.toUpperCase()}] ${r.id} — ${r.score} blocked`);
+    lines.push(`[${r.status.toUpperCase()}] ${r.name} — ${r.score} blocked`);
     for (const t of r.techniques) {
       lines.push(`  ${t.status === 'blocked' ? '✓' : '⚠'} ${t.name} — ${t.status === 'blocked' ? 'Blocked' : 'Passed: ' + t.note}`);
     }
+    lines.push('');
+  }
+
+  if (log && log.length) {
+    lines.push('Scan Log', '---------------------------------');
+    lines.push(...log);
     lines.push('');
   }
 
