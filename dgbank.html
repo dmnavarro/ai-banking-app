@@ -2401,7 +2401,7 @@ function openScannerPage() {
   if (teasers) teasers.classList.add('hidden');
   const apiKey = localStorage.getItem('visionone_api_key');
   const demo   = localStorage.getItem('visionone_demo') === 'true';
-  setScannerMode((demo || !apiKey) ? 'demo' : 'live');
+  setScannerMode((demo || (!apiKey && !serverHasDefaultKey)) ? 'demo' : 'live');
   renderObjectivesGrid();
   goToStep(1);
 }
@@ -2438,7 +2438,7 @@ function setScannerMode(mode) {
   if (mode === 'demo') {
     banner.classList.add('demo');
     label.textContent = 'Demo Mode — simulated attack campaign, no real API calls';
-  } else if (apiKey) {
+  } else if (apiKey || serverHasDefaultKey) {
     banner.classList.add('live');
     label.textContent = 'Live Mode — attack prompts sent to configured endpoint';
   } else {
