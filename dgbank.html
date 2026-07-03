@@ -1291,12 +1291,22 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
         <div class="sc-field-group" id="scModelField">
           <label>Target Model ID</label>
           <select class="sc-input" id="scTargetModel">
-            <option value="claude-3-haiku">claude-3-haiku</option>
-            <option value="claude-4-sonnet-aws" selected>claude-4-sonnet-aws</option>
-            <option value="claude-4.5-sonnet-aws">claude-4.5-sonnet-aws</option>
-            <option value="claude-4.5-haiku-aws">claude-4.5-haiku-aws</option>
-            <option value="claude-4.1-opus-aws">claude-4.1-opus-aws</option>
-            <option value="claude-4.5-opus-aws">claude-4.5-opus-aws</option>
+            <optgroup label="Anthropic (AWS)">
+              <option value="claude-3-haiku">claude-3-haiku</option>
+              <option value="claude-4-sonnet-aws" selected>claude-4-sonnet-aws</option>
+              <option value="claude-4.5-sonnet-aws">claude-4.5-sonnet-aws</option>
+              <option value="claude-4.5-haiku-aws">claude-4.5-haiku-aws</option>
+              <option value="claude-4.1-opus-aws">claude-4.1-opus-aws</option>
+              <option value="claude-4.5-opus-aws">claude-4.5-opus-aws</option>
+            </optgroup>
+            <optgroup label="NVIDIA">
+              <option value="nvidia/nemotron-3-ultra-550b-a55b">nvidia/nemotron-3-ultra-550b-a55b</option>
+              <option value="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning">nvidia/nemotron-3-nano-omni-30b-a3b-reasoning</option>
+              <option value="nvidia/nemotron-3.5-content-safety">nvidia/nemotron-3.5-content-safety</option>
+              <option value="nvidia/nemotron-3-content-safety">nvidia/nemotron-3-content-safety</option>
+              <option value="nvidia/cosmos3-nano">nvidia/cosmos3-nano</option>
+              <option value="nvidia/cosmos3-nano-reasoner">nvidia/cosmos3-nano-reasoner</option>
+            </optgroup>
           </select>
         </div>
       </div>
