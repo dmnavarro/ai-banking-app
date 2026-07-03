@@ -422,7 +422,24 @@ nav ul li.active a, nav ul li a:hover { color: var(--navy); border-bottom-color:
 .spend-pct { font-size: .78rem; font-weight: 700; color: var(--steel); font-variant-numeric: tabular-nums; min-width: 2.5rem; text-align: right; }
 
 /* ── CHATBOT ── */
-.chat-bubble { position: fixed; bottom: 1.75rem; right: 1.75rem; z-index: 1000; }
+.chat-bubble { position: fixed; bottom: 1.75rem; right: 1.75rem; z-index: 1000; display: flex; flex-direction: column; align-items: flex-end; gap: .65rem; }
+
+/* Floating teaser cards above chat toggle */
+.chat-teasers { display: flex; flex-direction: column; gap: .5rem; align-items: flex-end; transition: opacity .2s, transform .2s; }
+.chat-teasers.hidden { opacity: 0; pointer-events: none; transform: translateY(6px); }
+.chat-teaser-float {
+  width: 280px;
+  padding: .65rem .85rem;
+  border-radius: 12px;
+  display: flex; align-items: center; gap: .65rem;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0,0,0,.2);
+  transition: opacity .15s, transform .15s;
+}
+.chat-teaser-float:hover { transform: translateY(-2px); }
+.chat-teaser-float-text { font-size: .75rem; color: rgba(255,255,255,.85); line-height: 1.4; flex: 1; }
+.chat-teaser-float-text strong { color: #fff; display: block; margin-bottom: .1rem; font-size: .78rem; }
+.chat-teaser-float-cta { flex-shrink: 0; font-size: .7rem; font-weight: 700; color: #fff; white-space: nowrap; opacity: .85; }
 
 .chat-toggle {
   width: 56px; height: 56px; border-radius: 50%;
@@ -1657,20 +1674,6 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
         <div class="bot-av-sm">C</div>
         <div>
           <div class="msg-bubble">Hi Anakin! 👋 I'm C-3PO, your DG Bank assistant. I can help with transfers, account questions, card management, and more.<br><br>Use the tabs above to pick a query or type your own. AI Guard will scan each message if configured.</div>
-          <div class="scanner-teaser" onclick="openScannerPage()" title="Open AI Scanner">
-            <div class="scanner-teaser-text">
-              <strong>🛡️ Run an AI Security Scan</strong>
-              Test this chatbot's defenses with an automated attack campaign powered by TrendAI TMAS.
-            </div>
-            <div class="scanner-teaser-cta">Try it →</div>
-          </div>
-          <div class="scanner-teaser" style="background:linear-gradient(135deg,#0F4C35,#1A6B4A);margin-top:.5rem" onclick="document.querySelector('.preset-tab')?.click()" title="Test AI Guard">
-            <div class="scanner-teaser-text">
-              <strong>🤖 Test AI Guard in real time</strong>
-              Chat with C-3PO using Banking Queries or trigger blocks with Malicious Prompts to see AI Guard in action.
-            </div>
-            <div class="scanner-teaser-cta" style="background:rgba(255,255,255,.2);color:#fff">Explore →</div>
-          </div>
           <div class="msg-time">Just now</div>
         </div>
       </div>
@@ -1682,6 +1685,23 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
       <button class="chat-send" onclick="sendMessage()" title="Send">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
       </button>
+    </div>
+  </div>
+
+  <div class="chat-teasers" id="chatTeasers">
+    <div class="chat-teaser-float" style="background:linear-gradient(135deg,#0F172A,#1E3A5F)" onclick="openScannerPage()" title="Run AI Security Scan">
+      <div class="chat-teaser-float-text">
+        <strong>🛡️ Run an AI Security Scan</strong>
+        Automated attack campaign powered by TrendAI TMAS.
+      </div>
+      <div class="chat-teaser-float-cta">Try it →</div>
+    </div>
+    <div class="chat-teaser-float" style="background:linear-gradient(135deg,#0F4C35,#1A6B4A)" onclick="openChatToGuard()" title="Test AI Guard">
+      <div class="chat-teaser-float-text">
+        <strong>🤖 Test AI Guard in real time</strong>
+        Try Banking Queries or Malicious Prompts to see AI Guard in action.
+      </div>
+      <div class="chat-teaser-float-cta">Explore →</div>
     </div>
   </div>
 
@@ -2025,15 +2045,23 @@ let scanning = false;
 
 function toggleChat() {
   chatOpen = !chatOpen;
-  const win   = document.getElementById('chatWindow');
-  const badge = document.getElementById('chatBadge');
+  const win     = document.getElementById('chatWindow');
+  const badge   = document.getElementById('chatBadge');
+  const teasers = document.getElementById('chatTeasers');
   if (chatOpen) {
     win.classList.remove('hidden');
+    if (teasers) teasers.classList.add('hidden');
     badge.style.display = 'none';
     document.getElementById('chatInput').focus();
   } else {
     win.classList.add('hidden');
+    if (teasers) teasers.classList.remove('hidden');
   }
+}
+
+function openChatToGuard() {
+  if (!chatOpen) toggleChat();
+  switchTab('safe');
 }
 
 function switchTab(tab) {
