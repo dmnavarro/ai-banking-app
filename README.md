@@ -1,8 +1,18 @@
 # DG Bank — AI Banking Demo
 
-A fictional banking web app that demonstrates **Trend Micro Vision One AI Application Security** (AI Guard) and **Amazon Bedrock** (Claude) in a realistic customer-facing scenario.
+A fictional banking web app that demonstrates **Trend Micro Vision One AI Application Security** (AI Guard + AI Scanner) and **Vision One Code Security** alongside **Amazon Bedrock** (Claude) in a realistic customer-facing scenario.
 
 Built for Sales Engineers to deploy in their own AWS account and use during customer demos.
+
+---
+
+## Trend Micro product integrations
+
+| Product | Capability showcased |
+|---|---|
+| **Vision One AI Application Security — AI Guard** | Real-time prompt and response scanning. Intercepts every message sent to the chatbot and blocks malicious prompts (prompt injection, jailbreak, PII exfil, etc.) before they reach the model. Toggle between Guard Off, Demo (local pattern matching), and Guard On (live Vision One API). |
+| **Vision One AI Application Security — AI Scanner** | Automated red-team attack campaigns using TMAS `aiscan llm`. Generates attack prompts across configurable objectives (Sensitive Data Disclosure, System Prompt Leakage, Malicious Code Generation, Agent Tool Definition Leakage), streams results live via SSE, and exports a full report. |
+| **Vision One Code Security** | Static analysis of the application source code during CI/CD. The GitHub Actions pipeline runs a TMAS artifact scan on every push, surfacing vulnerabilities before the container image reaches ECS. |
 
 ---
 
@@ -10,10 +20,10 @@ Built for Sales Engineers to deploy in their own AWS account and use during cust
 
 | Feature | Description |
 |---|---|
-| **Blane, The Assistant** | AI chatbot powered by Amazon Bedrock (Claude 3 Haiku) |
+| **C-3PO, The Assistant** | AI chatbot powered by Amazon Bedrock (Claude 3 Haiku) |
 | **AI Guard** | Vision One prompt scanning — Demo, Guard On, or Guard Off modes |
 | **Malicious Prompts** | Pre-built attack presets (prompt injection, jailbreak, social engineering, PII exfil) to trigger AI Guard |
-| **AI Scanner** | Automated attack campaign tool — runs attack prompts against any OpenAI-compatible endpoint |
+| **AI Scanner** | Automated attack campaign powered by TMAS `aiscan llm` — streams live results via SSE, exports a full report |
 | **Banking UI** | Realistic dashboard with account balance, transactions, cards, and quick actions |
 
 ---
@@ -93,12 +103,12 @@ Use `--skip-oidc` on re-runs to avoid conflicts with the existing GitHub OIDC pr
 
 The default tab. Type any banking question or use the preset chips:
 
-- **Account balance** — ask Blane for your balance
+- **Account balance** — ask C-3PO for your balance
 - **Recent transactions** — get a transaction summary
 - **Transfer money** — initiate a transfer
 - **Interest rates**, **Investment options**, **Replace card**, **Credit status**, **Auto bill pay**
 
-Blane responds using Amazon Bedrock (Claude). Responses are scoped to banking — it will not answer off-topic questions.
+C-3PO responds using Amazon Bedrock (Claude). Responses are scoped to banking — it will not answer off-topic questions.
 
 ### AI Guard
 
@@ -136,13 +146,19 @@ With **Guard On** or **Demo** mode active, these will be blocked before reaching
 
 ### AI Scanner
 
-Click the **AI Scanner** button (top navigation) to run an automated attack campaign:
+Click the **AI Scanner** button (top navigation) to run an automated attack campaign powered by **TMAS `aiscan llm`**:
 
-1. **Configure Target** — set the endpoint URL, API key, and model
-2. **Select Attacks** — choose attack categories and individual prompts
-3. **Results** — see which prompts were blocked vs. passed, with a downloadable report
+**Demo mode** — runs a built-in set of attack prompts directly against any endpoint using the `/api/scanner/run` endpoint. No additional credentials needed.
 
-The scanner can target the local chatbot (`/api/aiguard/scan`) or any external OpenAI-compatible endpoint.
+**Live mode** — uses TMAS to generate and evaluate attack prompts professionally, streaming real-time progress via Server-Sent Events (SSE). Requires `TMAS_API_KEY` to be set on the server (see GitHub Actions secrets below).
+
+Workflow:
+1. **Step 1 — Target** — enter the chat endpoint URL (defaults to the local chatbot at `/api/chat`). Optionally provide an API key and model name.
+2. **Step 2 — Attack Objectives** — choose which attack categories to test (Sensitive Data Disclosure, System Prompt Leakage, etc.) and the techniques/modifiers to apply.
+3. **Step 3 — Run** — click **Launch Scan**. In Live mode, a terminal streams TMAS output in real time. When complete, a per-objective summary shows how many techniques were blocked vs. passed.
+4. **Export** — download a full text report including the scan log.
+
+> **Live mode note:** objectives `Model Discovery` and `Hallucination` are not supported by TMAS `aiscan llm` and fall back to the built-in prompt runner.
 
 ---
 
@@ -153,8 +169,11 @@ Browser
   └── ALB (HTTPS port 443, HTTP → HTTPS redirect)
         └── ECS Service (EC2, t3.small)
               └── Node.js container (port 3000)
-                    ├── /api/chat          → Amazon Bedrock (Claude)
-                    └── /api/aiguard/scan  → Vision One AI Application Security
+                    ├── /api/chat                        → Amazon Bedrock (Claude)
+                    ├── /api/aiguard/scan                → Vision One AI Application Security
+                    ├── /api/scanner/run                 → built-in attack runner (demo mode)
+                    ├── POST /api/scanner/tmas           → starts TMAS aiscan llm job (returns jobId)
+                    └── GET  /api/scanner/tmas/events/:jobId  → SSE stream of scan progress/results
 ```
 
 **AWS resources created by `deploy-ecs.sh`:**
@@ -174,7 +193,9 @@ Browser
 | Secret | Required | Description |
 |---|---|---|
 | `AWS_ROLE_ARN` | Yes | IAM role ARN printed by `deploy-ecs.sh` |
-| `TMAS_API_KEY` | No | Trend Micro TMAS key — enables security scan step in CI |
+| `TMAS_API_KEY` | No | Vision One API key with **AI Application Security** scope — used in two ways: (1) enables the `tmas artifact scan` step in CI, and (2) stored in AWS SSM (`/dgbank/tmas-api-key`) and injected into ECS to power AI Scanner Live mode |
+
+> **Getting the Vision One API key:** in the Vision One console go to **Administration → API Keys** and create a key with the *AI Application Security* permission. This is a different key from standard Bedrock/AWS credentials. Set it as the `TMAS_API_KEY` GitHub Actions secret and the CI pipeline will push it to SSM automatically on the next run.
 
 ---
 
