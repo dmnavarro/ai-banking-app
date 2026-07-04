@@ -74,11 +74,43 @@ jobs:
             --region "$AWS_REGION"
 
       - name: Deploy to ECS
+        env:
+          IMAGE_URI: ${{ steps.build-image.outputs.image }}
         run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          FILESCAN_BUCKET="dg-bank-scanning-${ACCOUNT_ID}-${AWS_REGION}"
+
+          # Get current task definition and inject updated image + FILESCAN_BUCKET
+          TASK_DEF_ARN=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION" \
+            --query "services[0].taskDefinition" \
+            --output text)
+
+          NEW_TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition "$TASK_DEF_ARN" \
+            --region "$AWS_REGION" \
+            --query "taskDefinition" | \
+            jq --arg img "$IMAGE_URI" --arg bucket "$FILESCAN_BUCKET" '
+              .containerDefinitions[0].image = $img |
+              .containerDefinitions[0].environment |=
+                (map(select(.name != "FILESCAN_BUCKET")) + [{"name":"FILESCAN_BUCKET","value":$bucket}]) |
+              del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+            ')
+
+          NEW_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --region "$AWS_REGION" \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+
+          echo "Registered task definition: $NEW_ARN"
+
           aws ecs update-service \
             --cluster "$ECS_CLUSTER" \
             --service "$ECS_SERVICE" \
-            --force-new-deployment \
+            --task-definition "$NEW_ARN" \
             --region "$AWS_REGION" \
             --output text --query "service.serviceName"
 

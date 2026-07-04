@@ -409,10 +409,13 @@ Resources:
       Protocol: HTTP
       Port: 3000
       TargetType: instance
-      HealthCheckPath: /
-      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 15
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "30"
 
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener

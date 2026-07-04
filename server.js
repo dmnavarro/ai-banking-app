@@ -392,12 +392,21 @@ app.get('/api/bills/scan-result', async (req, res) => {
   }
 });
 
+// Health check — fast response for ALB
+app.get('/health', (_req, res) => res.json({ ok: true }));
+
 // Serve the app at root
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, 'dgbank.html'));
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n  Trend Bank running → http://localhost:${PORT}\n`);
+});
+
+// Graceful shutdown — lets ECS drain connections quickly on SIGTERM
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received — shutting down gracefully');
+  server.close(() => process.exit(0));
 });
