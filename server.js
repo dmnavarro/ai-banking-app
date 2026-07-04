@@ -174,6 +174,7 @@ function buildTmasConfig(target, objectives) {
     `description: Live security scan against ${target.url}`,
     `target:`,
     `  name: ${target.groupName || 'dgbank-chatbot'}`,
+    ...(target.model ? [`  model: ${target.model}`] : []),
     `  endpoint: ${target.url}`,
     ...(target.apiKey ? [`  api_key_env: TARGET_API_KEY`] : []),
     `  custom:`,
