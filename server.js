@@ -6,7 +6,7 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { AmaasGrpcClient } = require('file-security-sdk');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '15mb' })); // SDK mode sends files as base64 (~33% overhead over 10MB limit)
 app.use(express.static(__dirname));
 
 const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID || 'anthropic.claude-3-haiku-20240307-v1:0';

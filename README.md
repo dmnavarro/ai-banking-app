@@ -17,10 +17,10 @@ Built for Sales Engineers to deploy in their own AWS account and use during cust
   - [Re-deploy / update](#re-deploy--update)
   - [Script options](#script-options)
 - [Using the app](#using-the-app)
-  - [Banking Queries tab](#banking-queries-tab)
   - [AI Guard](#ai-guard)
-  - [Malicious Prompts tab](#malicious-prompts-tab)
   - [AI Scanner](#ai-scanner)
+  - [File Security](#file-security)
+  - [Code Security](#code-security)
 - [Architecture](#architecture)
 - [GitHub Actions secrets](#github-actions-secrets)
 - [Local development](#local-development)
@@ -33,6 +33,7 @@ Built for Sales Engineers to deploy in their own AWS account and use during cust
 |---|---|
 | **Vision One AI Application Security — AI Guard** | Real-time prompt scanning on every chatbot message. Guard On by default when a server API key is configured. Falls back to local pattern matching automatically if the API is unreachable. Toggle Guard On/Off from the chat header pill. |
 | **Vision One AI Application Security — AI Scanner** | Automated red-team attack campaigns using TMAS `aiscan llm`. Generates attack prompts across configurable objectives (Sensitive Data Disclosure, System Prompt Leakage, Malicious Code Generation, Agent Tool Definition Leakage), streams results live via SSE, and exports a full report. Supports both Custom and OpenAI-compatible target endpoints. |
+| **Vision One File Security** | File scanning integrated into the Pay Bills feature. **Storage mode** monitors an S3 bucket via Vision One's Lambda integration — files are tagged as clean or quarantined after upload. **SDK mode** scans files inline on the server using the File Security Node.js SDK before anything is stored — threats are blocked instantly with no storage footprint. |
 | **Vision One Code Security** | Static analysis of the application source code during CI/CD. The GitHub Actions pipeline runs a TMAS artifact scan on every push, surfacing vulnerabilities before the container image reaches ECS. |
 
 ---
@@ -45,7 +46,9 @@ Built for Sales Engineers to deploy in their own AWS account and use during cust
 | **AI Guard** | TrendAI Vision One prompt scanning — Guard On (live API with demo fallback) or Guard Off |
 | **Malicious Prompts** | Pre-built attack presets (prompt injection, jailbreak, social engineering, PII exfil) to trigger AI Guard |
 | **AI Scanner** | Automated attack campaign powered by TMAS `aiscan llm` — streams live results via SSE, exports a full report |
-| **Banking UI** | Realistic dashboard with account balance, transactions, cards, and quick actions |
+| **File Security** | Pay Bills upload flow with Storage mode (S3 + Vision One Lambda) and SDK mode (inline scan before storage) |
+| **Code Security** | TMAS artifact scan runs in GitHub Actions on every push — findings visible in the CI workflow log |
+| **Banking UI** | Realistic dashboard with randomised account balance, transactions, cards, and quick actions |
 
 ---
 
@@ -117,67 +120,96 @@ Use `--skip-oidc` on re-runs to avoid conflicts with the existing GitHub OIDC pr
 
 ## Using the app
 
-### Banking Queries tab
+The app showcases four TrendAI products. The chatbot itself (C-3PO, powered by Amazon Bedrock Claude) is the target — AI Guard, AI Scanner, and File Security all protect it in different ways. Code Security protects the application's own source code during CI/CD.
 
-The default tab. Type any banking question or use the preset chips:
-
-- **Account balance** — ask C-3PO for your balance
-- **Recent transactions** — get a transaction summary
-- **Transfer money** — initiate a transfer
-- **Interest rates**, **Investment options**, **Replace card**, **Credit status**, **Auto bill pay**
-
-C-3PO responds using Amazon Bedrock (Claude). Responses are scoped to banking — it will not answer off-topic questions.
+---
 
 ### AI Guard
 
-The **Guard** pill in the chat header controls scanning:
+**What it does:** Scans every chatbot message in real time through TrendAI Vision One AI Application Security before it reaches Bedrock. Malicious prompts are blocked instantly — the model never sees them.
 
-| State | Behaviour |
-|---|---|
-| **Guard On** | Live TrendAI Vision One API scanning on every message. Falls back to local pattern matching automatically if the API is unreachable. |
-| **Guard Off** | Messages go straight to Bedrock, no scanning. |
-
-Click the pill to toggle between Guard On and Guard Off.
-
-**Default behaviour on deployment:** Guard On is active automatically when `TMAS_API_KEY` is set on the server (injected from SSM). No manual configuration needed for standard deployments.
-
-**Force Demo Mode:** check the *Force Demo Mode* checkbox in AI Application Security Configuration to bypass the live API entirely and use local pattern matching only — useful for offline presentations.
-
-**Setup for custom API key:**
-1. Click the gear icon → **AI Application Security Configuration**
-2. Enter your TrendAI Vision One API key (or leave blank to use the server default)
-3. Select your region (defaults to Singapore)
-4. Optionally enter a Guard ID / App Name (shown in Vision One dashboard)
-5. Click **Save & Enable**
-
-### Malicious Prompts tab
-
-Pre-built attack prompts to demonstrate AI Guard blocking:
+**How to demo:**
+1. The **Guard** pill in the chat header shows the current state. Click it to toggle Guard On / Guard Off.
+2. Switch to the **Malicious Prompts** tab and fire any of the preset attack chips:
 
 | Preset | Attack type |
 |---|---|
 | Prompt Injection | Override system instructions |
-| Jailbreak / DAN | Bypass AI safety guidelines |
+| DAN Jailbreak | Bypass AI safety guidelines |
 | Social Engineering | Impersonate bank IT to extract data |
-| Financial Fraud | Request money laundering assistance |
+| Financial Crime | Request money laundering assistance |
 | PII Exfiltration | Extract customer personal data |
 | Competitor Intel | Extract internal business data |
 
-With **Guard On** active, these will be blocked before reaching Bedrock. With **Guard Off**, they reach the model (which may still refuse, but no Vision One event is generated).
+With **Guard On**, blocked messages never reach Bedrock — a *Blocked by AI Guard* card appears in the chat. With **Guard Off**, the prompt reaches the model (which may still refuse, but no Vision One event is generated).
+
+**Configuration:**
+- **Default on deployment:** Guard On activates automatically when `TMAS_API_KEY` is set on the server. No manual setup needed.
+- **Force Demo Mode:** Tick the *Force Demo Mode* checkbox in the gear menu to use local pattern matching only — useful for offline presentations.
+- **Custom API key:** Gear icon → AI Application Security Configuration → enter your key, select your region, click **Save & Enable**.
+
+---
 
 ### AI Scanner
 
-Click the red **AI Scanner** button (top navigation) to run an automated attack campaign powered by **TMAS `aiscan llm`**. Floating teaser cards above the chat button also link directly to the scanner.
+**What it does:** Runs an automated red-team attack campaign against any AI endpoint using **TMAS `aiscan llm`**. Tests multiple attack objectives and shows which techniques were blocked vs. which got through.
 
-**Demo mode** — runs a built-in set of attack prompts directly against any endpoint using the `/api/scanner/run` endpoint. No additional credentials needed.
+**How to demo:**
+1. Click the **AI Scanner** button in the top navigation (or the floating teaser card above the chat button).
+2. **Step 1 — Target:** Enter the chat endpoint URL. Choose endpoint format: **Custom** (our chatbot format) or **OpenAI-compatible**. Optionally provide an API key and target model ID.
+3. **Step 2 — Attack Objectives:** Select which attack categories to run (Sensitive Data Disclosure, System Prompt Leakage, Malicious Code Generation, Agent Tool Definition Leakage).
+4. **Step 3 — Launch:** Click **Launch Scan**.
+   - **Demo mode** — runs built-in attack prompts locally. No TMAS credentials required.
+   - **Live mode** — invokes TMAS `aiscan llm` on the server, streaming real-time output via SSE. Requires `TMAS_API_KEY`.
+5. When complete, a per-objective scorecard shows blocked vs. passed techniques. Click **Export** to download the full scan log.
 
-**Live mode** — uses TMAS to generate and evaluate attack prompts professionally, streaming real-time progress via Server-Sent Events (SSE). Requires `TMAS_API_KEY` to be set on the server (injected automatically from SSM on ECS deployments).
+> Live mode activates automatically when `TMAS_API_KEY` is configured on the server — no manual key entry needed after deployment.
 
-Workflow:
-1. **Step 1 — Target** — enter the chat endpoint URL. Select endpoint format: **Custom** or **OpenAI-compatible**. Optionally provide an API key and model.
-2. **Step 2 — Attack Objectives** — choose which attack categories to test. Defaults to Sensitive Data Disclosure.
-3. **Step 3 — Run** — click **Launch Scan**. In Live mode, a terminal streams TMAS output in real time. When complete, a per-objective summary shows how many techniques were blocked vs. passed.
-4. **Export** — download a full text report including the scan log.
+---
+
+### File Security
+
+**What it does:** Scans file uploads in the **Pay Bills** feature using Vision One File Security. Two modes demonstrate different integration approaches.
+
+**How to demo:**
+1. From the dashboard, click **Pay Bills** in the quick actions.
+2. Choose a mode using the toggle at the top:
+
+**Storage mode** (Vision One File Security — Storage integration)
+- Drop or select a file (PDF, image, or TXT, up to 10 MB).
+- The file is uploaded directly to an S3 scanning bucket via a presigned URL.
+- Vision One File Security's Lambda monitors the bucket and scans the file automatically.
+- The app polls the S3 object tags (`fss-scanned`, `fss-scan-result`) and shows the result when ready.
+- Clean files show a green *File cleared — Submit Payment* card. Threats show a red *File quarantined* card.
+
+**SDK mode** (Vision One File Security — SDK integration)
+- Drop or select a file.
+- The file is sent to the Node.js server and scanned **inline** using the [Vision One File Security Node.js SDK](https://github.com/trendmicro/tm-v1-fs-nodejs-sdk) **before being stored anywhere**.
+- The result is returned immediately — no polling, no storage footprint for malicious files.
+- This demonstrates shift-left file security: threats are blocked at the application layer, not detected after the fact.
+
+**Setup required before demo:**
+1. Deploy the S3 buckets: `./deploy-filesecurity.sh`
+2. In Vision One console → File Security → Storage → add the scanning bucket and enable the scanning rule.
+3. Ensure `TMAS_API_KEY` is set (used by the SDK endpoint — same key as AI Guard/Scanner).
+
+---
+
+### Code Security
+
+**What it does:** Scans the application's own source code and dependencies for vulnerabilities, secrets, and malware during every CI/CD pipeline run using **TMAS artifact scan**.
+
+**How to demo:**
+
+This integration is visible in your **GitHub Actions** workflow — not in the app UI itself. To see it live:
+
+1. **Fork this repository** to your own GitHub account.
+2. Set up the required GitHub Actions secrets (see [GitHub Actions secrets](#github-actions-secrets)).
+3. Push any commit to `main`.
+4. In GitHub → **Actions** → select the latest **Build and Deploy to ECS** workflow run.
+5. Expand the **Code Security Scan (TMAS)** step to see TMAS scanning the source code in real time — vulnerability findings, secret detection, and a pass/fail result are all visible in the step log.
+
+Every push to `main` triggers this scan automatically. Findings surface directly in the GitHub Actions UI and can be reviewed before the container image is promoted to ECS.
 
 ---
 
