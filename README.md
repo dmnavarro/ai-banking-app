@@ -244,6 +244,7 @@ With **Guard On**, blocked messages never reach Bedrock — a *Blocked by AI Gua
 - **Default on deployment:** Guard On activates automatically when `TMAS_API_KEY` is set on the server. No manual setup needed.
 - **Force Demo Mode:** Tick the *Force Demo Mode* checkbox in the gear menu to use local pattern matching only — useful for offline presentations.
 - **Custom API key:** Gear icon → AI Application Security Configuration → enter your key, select your region, click **Save & Enable**.
+- **Self-hosted AI Guard:** Gear icon → Self-hosted Endpoints → enter your AI Guard endpoint URL. When set, AI Guard calls your endpoint instead of the Trend-hosted service. The status card in the drawer shows **Self-Hosted AI Guard** or **Trend-Hosted AI Guard** so it is always clear which service is active.
 
 ---
 
@@ -257,10 +258,12 @@ With **Guard On**, blocked messages never reach Bedrock — a *Blocked by AI Gua
 3. **Step 2 — Attack Objectives:** Select which attack categories to run (Sensitive Data Disclosure, System Prompt Leakage, Malicious Code Generation, Agent Tool Definition Leakage).
 4. **Step 3 — Launch:** Click **Launch Scan**.
    - **Demo mode** — runs built-in attack prompts locally. No TMAS credentials required.
-   - **Live mode** — invokes TMAS `aiscan llm` on the server, streaming real-time output via SSE. Requires `TMAS_API_KEY`.
+   - **Live mode** — invokes TMAS `aiscan llm` on the server, streaming real-time output via SSE. Requires `TMAS_API_KEY`. The mode banner shows **Trend-Hosted AI Scanner** or **Self-Hosted AI Scanner** so it is clear which judge is running.
 5. When complete, a per-objective scorecard shows blocked vs. passed techniques. Click **Export** to download the full scan log.
 
 > Live mode activates automatically when `TMAS_API_KEY` is configured on the server — no manual key entry needed after deployment.
+
+**Self-hosted judge:** Gear icon → Self-hosted Endpoints → enter your judge endpoint URL. When set, TMAS routes the scan through your judge instead of the Trend-hosted service. Leave blank to use the Trend-hosted service.
 
 ---
 
