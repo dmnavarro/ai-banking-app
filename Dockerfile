@@ -2,7 +2,7 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install TMAS CLI
+# Install TMAS CLI (bump comment to bust Docker layer cache when upgrading: v2.271.0)
 RUN apk add --no-cache curl tar && \
     curl -fSL --retry 3 --retry-delay 2 \
       "https://ast-cli.xdr.trendmicro.com/tmas-cli/latest/tmas-cli_Linux_x86_64.tar.gz" \

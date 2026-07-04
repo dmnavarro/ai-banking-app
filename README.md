@@ -10,19 +10,15 @@ Built for Sales Engineers to deploy in their own AWS account and use during cust
 
 - [TrendAI product integrations](#trendai-product-integrations)
 - [What's in the demo](#whats-in-the-demo)
-- [Deploy](#deploy-fresh-account)
-  - [Prerequisites](#prerequisites)
-  - [One-command deploy](#one-command-deploy)
-  - [After deploy](#after-deploy)
-  - [Re-deploy / update](#re-deploy--update)
-  - [Script options](#script-options)
+- [Resources deployed](#resources-deployed)
+- [Prerequisites](#prerequisites)
+- [Full deployment walkthrough](#full-deployment-walkthrough)
 - [Using the app](#using-the-app)
   - [AI Guard](#ai-guard)
   - [AI Scanner](#ai-scanner)
   - [File Security](#file-security)
   - [Code Security](#code-security)
-- [Architecture](#architecture)
-- [GitHub Actions secrets](#github-actions-secrets)
+- [Script reference](#script-reference)
 - [Local development](#local-development)
 
 ---
@@ -46,7 +42,7 @@ These products protect the AWS infrastructure running this app. They are not int
 |---|---|
 | **Vision One Container Security** | Deployed on the ECS host to provide runtime container protection. Detects anomalous process execution, file system changes, and network behaviour inside the container — even if an attacker bypasses the application layer. |
 | **Vision One CREM (Cloud Risk and Exposure Management)** | Provides full visibility into the AWS environment — cloud asset inventory, misconfigurations, identity risk, and exposure scoring. Lets you show customers how Trend continuously assesses cloud risk beyond just workload protection. |
-| **Vision One Network Security — Cloud IPS** | Deployed inline on the VPC to inspect all traffic to and from the ECS workload. Blocks known exploit attempts, vulnerability scans, and malicious traffic at the network layer before they reach the application — complementing AI Guard which protects at the AI prompt layer. |
+| **Vision One Network Security — Cloud IPS** | Deployed inline on the VPC via AWS Network Firewall with TrendAI managed rule groups. Inspects all traffic to and from the ECS workload and blocks known exploit attempts, vulnerability scans, and malicious traffic at the network layer — complementing AI Guard which protects at the AI prompt layer. |
 
 ---
 
@@ -64,15 +60,78 @@ These products protect the AWS infrastructure running this app. They are not int
 
 ---
 
-## Deploy (fresh account)
+## Resources deployed
 
-### Prerequisites
+### `deploy-ecs.sh` — main infrastructure (CloudFormation: `cloudformation/ecs.yml`)
 
-- AWS CLI configured (`aws configure`)
-- Docker installed and running
-- An ACM wildcard certificate in your region — optional, for HTTPS
+**Networking**
+- VPC (10.0.0.0/16) with 2 public subnets and 2 firewall subnets across AZs
+- Internet Gateway + per-AZ route tables + IGW ingress route table
+- AWS Network Firewall with TrendAI Cloud IPS managed rule groups
 
-### One-command deploy
+**Compute**
+- ECS Cluster (EC2 launch type, t3.small by default)
+- ECS Auto Scaling Group + Launch Template (Amazon ECS-optimized AMI)
+- ECS Task Definition + Service
+- Application Load Balancer with HTTP (and optional HTTPS) listener
+
+**IAM**
+- ECS Task Role — Bedrock invoke, S3 read/write, SSM read
+- EC2 Instance Role — ECS agent, ECR pull, SSM managed instance
+- GitHub Actions IAM Role + OIDC Provider for passwordless CI/CD
+
+**Other**
+- ECR Repository (created before the CF stack)
+- CloudWatch Log Group for container logs
+- SSM Parameter for TMAS API key (written by CI on first push, read by ECS at runtime)
+
+### `deploy-filesecurity.sh` — File Security buckets (CloudFormation: `cloudformation/filesecurity-buckets.yaml`)
+
+- S3 Scanning Bucket — files uploaded here are scanned by the Vision One Lambda
+- S3 Quarantine Bucket — clean vs. quarantined results tracked via S3 object tags
+- IAM Managed Policy for S3 access, attached to the ECS task role
+
+---
+
+## Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| AWS CLI | Configured with an IAM identity that has broad CloudFormation/EC2/ECS/IAM permissions |
+| Docker | Must be running; used to build the `linux/amd64` container image |
+| GitHub account | You must fork this repo so you control the Actions workflow |
+| Vision One API key | Go to **Administration → API Keys** and create a key with **AI Application Security** scope. This single key powers AI Guard live mode, AI Scanner live mode, and File Security SDK mode. |
+| Amazon Bedrock model access | In the AWS console → Bedrock → Model access, enable **Claude 3 Haiku** (or your chosen model) in your target region |
+| (Optional) ACM certificate | For HTTPS — request a wildcard cert in ACM before running the deploy script |
+
+---
+
+## Full deployment walkthrough
+
+Follow these steps in order for a complete demo experience.
+
+### Step 1 — Fork and clone
+
+Fork this repository to your own GitHub account, then clone it:
+
+```bash
+git clone https://github.com/<your-github-org>/ai-banking-app.git
+cd ai-banking-app
+```
+
+### Step 2 — Add your Vision One API key as a GitHub Actions secret
+
+Before the first deploy, add the key so CI/CD can use it immediately:
+
+Go to your forked repo → **Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret | Value |
+|---|---|
+| `TMAS_API_KEY` | Your Vision One API key (AI Application Security scope) |
+
+> `AWS_ROLE_ARN` will be added after Step 3 — you don't have it yet.
+
+### Step 3 — Deploy the main ECS stack
 
 ```bash
 ./deploy-ecs.sh --github-org <your-github-username>
@@ -86,55 +145,81 @@ With HTTPS:
   --certificate-arn arn:aws:acm:<region>:<account>:certificate/<id>
 ```
 
-The script will:
+This will:
 1. Create the ECR repository
 2. Build and push the Docker image (`linux/amd64`)
-3. Deploy the CloudFormation stack (VPC, ECS on EC2, ALB, IAM, OIDC)
+3. Deploy the CloudFormation stack — VPC, Network Firewall, ECS, ALB, IAM, OIDC (~15–20 min including firewall provisioning)
 4. Wait for the service to be healthy
-5. Print the app URL, DNS target, and GitHub Actions role ARN
+5. **Print the app URL, ALB DNS name, and GitHub Actions role ARN**
 
-### After deploy
+### Step 4 — Add the remaining GitHub Actions secret
 
-The script prints two things to finish setup:
+After Step 3 completes, add the role ARN printed by the script:
 
-**1. DNS** — add a CNAME at your DNS provider pointing your custom domain to the ALB DNS name printed by the script.
+| Secret | Value |
+|---|---|
+| `AWS_ROLE_ARN` | Role ARN printed by `deploy-ecs.sh` |
 
-**2. GitHub Actions secret** — go to your repo → Settings → Secrets and variables → Actions:
-```
-AWS_ROLE_ARN = <role ARN printed by script>
-```
+### Step 5 — (Optional) Add DNS
 
-After that, every push to `main` automatically builds and deploys to ECS.
+If you have a custom domain, add a CNAME record at your DNS provider pointing to the ALB DNS name printed by the deploy script.
 
-### Re-deploy / update
+### Step 6 — Push to main (first CI run)
+
+Push any commit to trigger the first GitHub Actions run:
 
 ```bash
-./deploy-ecs.sh --github-org <your-github-username> --skip-oidc [--certificate-arn <arn>]
+git commit --allow-empty -m "trigger first deploy"
+git push
 ```
 
-Use `--skip-oidc` on re-runs to avoid conflicts with the existing GitHub OIDC provider.
+This run will:
+- Build a fresh Docker image (with the latest TMAS CLI)
+- Run the **Code Security Scan (TMAS)** step — visible in the Actions log
+- Sync `TMAS_API_KEY` to AWS SSM so the ECS container can read it at runtime
+- Deploy the new image to ECS
 
-### Script options
+After this run, AI Guard and AI Scanner live mode will both work without any manual key entry in the app.
 
-| Option | Default | Description |
-|---|---|---|
-| `--github-org` | *(required)* | Your GitHub username or org |
-| `--github-repo` | `ai-banking-app` | Repository name |
-| `--region` | `ap-southeast-1` | AWS region |
-| `--instance-type` | `t3.small` | EC2 instance type |
-| `--bedrock-region` | `ap-southeast-1` | Bedrock API region |
-| `--bedrock-model` | `anthropic.claude-3-haiku-20240307-v1:0` | Bedrock model ID |
-| `--certificate-arn` | *(empty)* | ACM cert ARN for HTTPS |
-| `--skip-oidc` | *(off)* | Skip OIDC provider creation |
-| `--stack-name` | `dgbank-ai-app-demo-ecs` | CloudFormation stack name |
+### Step 7 — Deploy File Security buckets
+
+```bash
+./deploy-filesecurity.sh
+```
+
+This creates the S3 scanning and quarantine buckets and attaches the IAM policy to the ECS task role. The script prints the bucket names when done.
+
+### Step 8 — Connect File Security Storage mode in Vision One
+
+1. In the Vision One console → **File Security → Storage**
+2. Add the **scanning bucket** (name printed by Step 7)
+3. Add the **quarantine bucket** (name printed by Step 7)
+4. Enable the scanning rule
+
+After this, uploading a file in **Storage mode** in the app will trigger a real Vision One File Security scan.
+
+### Step 9 — Redeploy ECS to pick up the File Security bucket
+
+```bash
+./deploy-ecs.sh --github-org <your-github-username> --skip-oidc
+```
+
+Or simply push a commit — CI will inject the bucket name automatically via the deploy workflow.
+
+### Step 10 — Verify the full experience
+
+| Feature | How to verify |
+|---|---|
+| AI Guard | Chat header pill shows **Guard On**; send a malicious prompt — it should be blocked |
+| AI Scanner | Click **AI Scanner** → select objectives → **Launch Scan** — results stream live |
+| File Security Storage | Pay Bills → Storage mode → upload a file → scan result appears |
+| File Security SDK | Pay Bills → SDK mode → upload a file → instant inline result |
+| Code Security | GitHub Actions → latest run → expand **Code Security Scan (TMAS)** step |
+| Network Firewall | Vision One console → Network Security → Cloud IPS events |
 
 ---
 
 ## Using the app
-
-The app showcases four TrendAI products. The chatbot itself (C-3PO, powered by Amazon Bedrock Claude) is the target — AI Guard, AI Scanner, and File Security all protect it in different ways. Code Security protects the application's own source code during CI/CD.
-
----
 
 ### AI Guard
 
@@ -200,11 +285,6 @@ With **Guard On**, blocked messages never reach Bedrock — a *Blocked by AI Gua
 - The result is returned immediately — no polling, no storage footprint for malicious files.
 - This demonstrates shift-left file security: threats are blocked at the application layer, not detected after the fact.
 
-**Setup required before demo:**
-1. Deploy the S3 buckets: `./deploy-filesecurity.sh`
-2. In Vision One console → File Security → Storage → add the scanning bucket and enable the scanning rule.
-3. Ensure `TMAS_API_KEY` is set (used by the SDK endpoint — same key as AI Guard/Scanner).
-
 ---
 
 ### Code Security
@@ -216,7 +296,7 @@ With **Guard On**, blocked messages never reach Bedrock — a *Blocked by AI Gua
 This integration is visible in your **GitHub Actions** workflow — not in the app UI itself. To see it live:
 
 1. **Fork this repository** to your own GitHub account.
-2. Set up the required GitHub Actions secrets (see [GitHub Actions secrets](#github-actions-secrets)).
+2. Set up the required GitHub Actions secrets (see the [Full deployment walkthrough](#full-deployment-walkthrough)).
 3. Push any commit to `main`.
 4. In GitHub → **Actions** → select the latest **Build and Deploy to ECS** workflow run.
 5. Expand the **Code Security Scan (TMAS)** step to see TMAS scanning the source code in real time — vulnerability findings, secret detection, and a pass/fail result are all visible in the step log.
@@ -225,38 +305,28 @@ Every push to `main` triggers this scan automatically. Findings surface directly
 
 ---
 
-## Architecture
+## Script reference
 
-```
-Browser
-  └── ALB (HTTPS port 443, HTTP → HTTPS redirect)
-        └── ECS Service (EC2, t3.small)
-              └── Node.js Express app
-                    ├── Chat API        → Amazon Bedrock (Claude)
-                    ├── AI Guard proxy  → TrendAI Vision One AI Application Security
-                    └── AI Scanner API  → TMAS aiscan llm (SSE streaming)
-```
+### `deploy-ecs.sh`
 
-**AWS resources created by `deploy-ecs.sh`:**
-
-- VPC with 2 public subnets across AZs
-- Internet Gateway + route tables
-- Application Load Balancer (HTTP + HTTPS)
-- ECS Cluster on EC2 with Auto Scaling Group
-- ECS Task Role with Bedrock invoke permissions
-- GitHub Actions IAM Role (OIDC) for CI/CD
-- CloudWatch Log Group for container logs
-
----
-
-## GitHub Actions secrets
-
-| Secret | Required | Description |
+| Option | Default | Description |
 |---|---|---|
-| `AWS_ROLE_ARN` | Yes | IAM role ARN printed by `deploy-ecs.sh` |
-| `TMAS_API_KEY` | **Yes** | TrendAI Vision One API key with **AI Application Security** scope — used in three ways: (1) enables the `tmas artifact scan` step in CI, (2) stored in AWS SSM and injected into ECS to power AI Scanner Live mode, and (3) used as the default API key for AI Guard live scanning (no manual key entry needed after deployment) |
+| `--github-org` | *(required)* | Your GitHub username or org |
+| `--github-repo` | `ai-banking-app` | Repository name |
+| `--region` | `ap-southeast-1` | AWS region |
+| `--instance-type` | `t3.small` | EC2 instance type |
+| `--bedrock-region` | `ap-southeast-1` | Bedrock API region |
+| `--bedrock-model` | `anthropic.claude-3-haiku-20240307-v1:0` | Bedrock model ID |
+| `--certificate-arn` | *(empty)* | ACM cert ARN for HTTPS |
+| `--skip-oidc` | *(off)* | Skip OIDC provider creation on re-runs |
+| `--stack-name` | `dgbank-ai-app-demo-ecs` | CloudFormation stack name |
 
-> **Getting the Vision One API key:** in the Vision One console go to **Administration → API Keys** and create a key with the *AI Application Security* permission. This is a different key from standard Bedrock/AWS credentials. Set it as the `TMAS_API_KEY` GitHub Actions secret and the CI pipeline will push it to SSM automatically on the next run.
+### `deploy-filesecurity.sh`
+
+| Option | Default | Description |
+|---|---|---|
+| `--region` | `ap-southeast-1` | AWS region |
+| `--ecs-stack` | `dgbank-ai-app-demo-ecs` | Name of the ECS CF stack (to find the task role) |
 
 ---
 

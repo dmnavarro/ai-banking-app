@@ -114,17 +114,160 @@ Resources:
         - Key: Name
           Value: dgbank-ai-app-demo-public-b
 
+  # ---------------------------------------------------------------------------
+  # Network Firewall subnets — one per AZ, /28 is sufficient for GWLB endpoints
+  # ---------------------------------------------------------------------------
+  FirewallSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.3.0/28
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Tags:
+        - Key: Name
+          Value: dgbank-ai-app-demo-fw-a
+
+  FirewallSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.4.0/28
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      Tags:
+        - Key: Name
+          Value: dgbank-ai-app-demo-fw-b
+
+  # Firewall subnets use the existing PublicRouteTable (0.0.0.0/0 → IGW)
+  FirewallSubnetAAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref FirewallSubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  FirewallSubnetBAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref FirewallSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  # ---------------------------------------------------------------------------
+  # AWS Network Firewall — TrendAI Vision One Cloud IPS
+  # ---------------------------------------------------------------------------
+  NetworkFirewallPolicy:
+    Type: AWS::NetworkFirewall::FirewallPolicy
+    Properties:
+      FirewallPolicyName: dgbank-ai-app-demo-fw-policy
+      FirewallPolicy:
+        StatelessDefaultActions:
+          - aws:forward_to_sfe
+        StatelessFragmentDefaultActions:
+          - aws:forward_to_sfe
+        StatefulEngineOptions:
+          RuleOrder: STRICT_ORDER
+        StatefulRuleGroupReferences:
+          - ResourceArn: !Sub "arn:aws:network-firewall:${AWS::Region}:aws-managed:stateful-rulegroup/TrendAI-MalwareBlockStrictOrder"
+            Priority: 100
+          - ResourceArn: !Sub "arn:aws:network-firewall:${AWS::Region}:aws-managed:stateful-rulegroup/TrendAI-CVEClientBlockStrictOrder"
+            Priority: 200
+          - ResourceArn: !Sub "arn:aws:network-firewall:${AWS::Region}:aws-managed:stateful-rulegroup/TrendAI-CVEServerBlockStrictOrder"
+            Priority: 300
+      Tags:
+        - Key: Name
+          Value: dgbank-ai-app-demo-fw-policy
+
+  NetworkFirewall:
+    Type: AWS::NetworkFirewall::Firewall
+    Properties:
+      FirewallName: dgbank-ai-app-demo-firewall
+      VpcId: !Ref VPC
+      SubnetMappings:
+        - SubnetId: !Ref FirewallSubnetA
+        - SubnetId: !Ref FirewallSubnetB
+      FirewallPolicyArn: !Ref NetworkFirewallPolicy
+      Tags:
+        - Key: Name
+          Value: dgbank-ai-app-demo-firewall
+
+  # ---------------------------------------------------------------------------
+  # Per-AZ route tables for public subnets — egress routes through firewall
+  # EndpointIds order matches SubnetMappings order: index 0 = AZ-A, index 1 = AZ-B
+  # ---------------------------------------------------------------------------
+  PublicRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: dgbank-ai-app-demo-public-rt-a
+
+  PublicRouteA:
+    Type: AWS::EC2::Route
+    DependsOn: NetworkFirewall
+    Properties:
+      RouteTableId: !Ref PublicRouteTableA
+      DestinationCidrBlock: 0.0.0.0/0
+      VpcEndpointId: !Select [1, !Split [":", !Select [0, !GetAtt NetworkFirewall.EndpointIds]]]
+
   SubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnetA
-      RouteTableId: !Ref PublicRouteTable
+      RouteTableId: !Ref PublicRouteTableA
+
+  PublicRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: dgbank-ai-app-demo-public-rt-b
+
+  PublicRouteB:
+    Type: AWS::EC2::Route
+    DependsOn: NetworkFirewall
+    Properties:
+      RouteTableId: !Ref PublicRouteTableB
+      DestinationCidrBlock: 0.0.0.0/0
+      VpcEndpointId: !Select [1, !Split [":", !Select [1, !GetAtt NetworkFirewall.EndpointIds]]]
 
   SubnetBRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnetB
-      RouteTableId: !Ref PublicRouteTable
+      RouteTableId: !Ref PublicRouteTableB
+
+  # ---------------------------------------------------------------------------
+  # IGW ingress route table — routes inbound traffic through firewall endpoints
+  # ---------------------------------------------------------------------------
+  IGWRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: dgbank-ai-app-demo-igw-rt
+
+  IGWRouteSubnetA:
+    Type: AWS::EC2::Route
+    DependsOn: NetworkFirewall
+    Properties:
+      RouteTableId: !Ref IGWRouteTable
+      DestinationCidrBlock: 10.0.1.0/24
+      VpcEndpointId: !Select [1, !Split [":", !Select [0, !GetAtt NetworkFirewall.EndpointIds]]]
+
+  IGWRouteSubnetB:
+    Type: AWS::EC2::Route
+    DependsOn: NetworkFirewall
+    Properties:
+      RouteTableId: !Ref IGWRouteTable
+      DestinationCidrBlock: 10.0.2.0/24
+      VpcEndpointId: !Select [1, !Split [":", !Select [1, !GetAtt NetworkFirewall.EndpointIds]]]
+
+  IGWRouteTableAssociation:
+    Type: AWS::EC2::GatewayRouteTableAssociation
+    Properties:
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref IGWRouteTable
 
   # ---------------------------------------------------------------------------
   # GitHub OIDC Provider (conditional)
