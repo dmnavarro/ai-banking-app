@@ -191,6 +191,7 @@ function buildTmasConfig(target, objectives) {
       `      stream: false`,
     ] : [
       `      message: "{{prompt}}"`,
+      `      history: []`,
     ]),
     `    response:`,
     ...(isOpenAI ? [
@@ -206,15 +207,13 @@ function buildTmasConfig(target, objectives) {
     `settings:`,
     `  concurrency: 5`,
     `attack_objectives:`,
-    ...attackObjectives.flatMap(obj => {
-      const techs = obj.techniques.filter(t => t && t.toLowerCase() !== 'none');
-      const mods  = obj.modifiers.filter(m => m && m.toLowerCase() !== 'none');
-      return [
-        `  - name: ${obj.name}`,
-        ...(techs.length ? [`    techniques:`, ...techs.map(t => `      - "${t}"`)] : []),
-        ...(mods.length  ? [`    modifiers:`,  ...mods.map(m  => `      - "${m}"`)] : []),
-      ];
-    }),
+    ...attackObjectives.flatMap(obj => [
+      `  - name: ${obj.name}`,
+      `    techniques:`,
+      ...obj.techniques.map(t => `      - ${t}`),
+      `    modifiers:`,
+      ...obj.modifiers.map(m => `      - ${m}`),
+    ]),
   ].join('\n');
 }
 
