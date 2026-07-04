@@ -219,10 +219,10 @@ function buildTmasConfig(target, objectives) {
 
 // Start a TMAS scan — returns jobId immediately
 app.post('/api/scanner/tmas', (req, res) => {
-  const { target, objectives } = req.body || {};
+  const { target, objectives, visionOneApiKey } = req.body || {};
   if (!target || !target.url) return res.status(400).json({ error: 'target.url is required' });
 
-  const apiKey = (process.env.TMAS_API_KEY || '').trim();
+  const apiKey = (visionOneApiKey || process.env.TMAS_API_KEY || '').trim();
   if (!apiKey) return res.status(503).json({ error: 'TMAS_API_KEY not configured on this server' });
 
   try {

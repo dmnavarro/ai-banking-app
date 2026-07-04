@@ -3289,6 +3289,7 @@ async function runLiveScan(active, targetLabel, targetUrl) {
         body: JSON.stringify({
           target: { url: targetUrl, apiKey: apiKey || undefined, groupName, endpointType: endpointFormat, model: document.getElementById('scTargetModel').value, bearerPrefix: document.getElementById('scBearerPrefix').checked },
           objectives,
+          visionOneApiKey: localStorage.getItem('visionone_api_key') || undefined,
         }),
       });
       const { jobId, error: startErr } = await startResp.json();
