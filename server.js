@@ -254,6 +254,10 @@ app.post('/api/scanner/tmas', (req, res) => {
   const configYaml = buildTmasConfig(target, objectives);
   fs.writeFileSync(configFile, configYaml);
   console.log(`[TMAS] job=${jobId} config=${configFile}\n${configYaml}`);
+  try {
+    const tmasVer = require('child_process').execSync('tmas version 2>&1', { encoding: 'utf8' }).trim();
+    emit('log', { message: `TMAS ${tmasVer}`, level: 'dim' });
+  } catch { /* tmas not found — caught later */ }
   emit('log', { message: 'TMAS config written — launching scan...', level: 'dim' });
 
   const env  = { ...process.env, TMAS_API_KEY: apiKey };
