@@ -373,14 +373,17 @@ nav ul li.active a, nav ul li a:hover { color: var(--navy); border-bottom-color:
 }
 
 .drawer-close {
-  width: 30px; height: 30px;
-  border: none; border-radius: 7px;
+  width: 36px; height: 36px;
+  border: none; border-radius: 8px;
   background: var(--sky); color: var(--steel);
-  cursor: pointer; display: flex;
+  cursor: pointer; display: flex; flex-shrink: 0;
   align-items: center; justify-content: center;
   transition: background .15s;
 }
 .drawer-close:hover { background: var(--border); color: var(--navy); }
+@media (max-width: 600px) {
+  .drawer-close { width: 44px; height: 44px; border-radius: 10px; }
+}
 
 .drawer-body { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
 
@@ -628,6 +631,7 @@ nav ul li.active a, nav ul li a:hover { color: var(--navy); border-bottom-color:
   transition: opacity .2s, transform .2s;
 }
 .chat-window.hidden { opacity: 0; transform: scale(.9) translateY(10px); pointer-events: none; }
+.chat-window.guard-on { border-color: #10B981; box-shadow: 0 16px 60px rgba(30,6,8,.22), 0 0 0 2px rgba(16,185,129,.25); }
 
 .chat-header {
   background: var(--navy); padding: .85rem 1.15rem;
@@ -2104,9 +2108,9 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
 let serverHasDefaultKey = false;
 fetch('/api/config').then(r => r.json()).then(cfg => {
   serverHasDefaultKey = !!cfg.hasDefaultApiKey;
-  // Auto-enable Guard On if a key is available and user has no saved preference
-  if (serverHasDefaultKey && localStorage.getItem('guard_enabled') === null) {
-    localStorage.setItem('guard_enabled', 'true');
+  // Auto-enable Guard On each fresh session when a key is available
+  if (serverHasDefaultKey && sessionStorage.getItem('guard_enabled') === null) {
+    sessionStorage.setItem('guard_enabled', 'true');
   }
   refreshStatusCard();
   updateGuardPill();
@@ -2252,7 +2256,7 @@ const SHIELD = '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke
 
 // Guard state: on/off only. Demo is a forced fallback via settings checkbox, not a pill state.
 function isGuardOn() {
-  const saved = localStorage.getItem('guard_enabled');
+  const saved = sessionStorage.getItem('guard_enabled');
   if (saved !== null) return saved === 'true';
   // Default: on if any key is available
   return serverHasDefaultKey || !!localStorage.getItem('visionone_api_key');
@@ -2261,7 +2265,7 @@ function isGuardOn() {
 function toggleGuard() {
   const hasKey = serverHasDefaultKey || !!localStorage.getItem('visionone_api_key');
   if (!hasKey) return;
-  localStorage.setItem('guard_enabled', !isGuardOn());
+  sessionStorage.setItem('guard_enabled', !isGuardOn());
   updateGuardPill();
 }
 
@@ -2281,13 +2285,16 @@ function updateGuardPill() {
     return;
   }
 
+  const chatWin = document.getElementById('chatWindow');
   if (on) {
     pill.classList.add('active');
     pill.innerHTML = `${SHIELD} Guard On`;
     pill.title = 'Click to turn Guard Off';
     pill.onclick = toggleGuard;
     dot.classList.add('show');
+    if (chatWin) chatWin.classList.add('guard-on');
   } else {
+    if (chatWin) chatWin.classList.remove('guard-on');
     pill.classList.add(hasKey ? 'disabled' : 'unconfigured');
     pill.innerHTML = hasKey
       ? `${SHIELD} Guard Off`
@@ -2850,7 +2857,7 @@ function handlePbFiles(files) {
 
 function setPbStage(label, pct, scanning = false) {
   document.getElementById('pbStageLabel').textContent  = label;
-  document.getElementById('pbProgressPct').textContent = Math.round(pct) + '%';
+  document.getElementById('pbProgressPct').textContent = scanning ? '' : Math.round(pct) + '%';
   const fill = document.getElementById('pbProgressFill');
   fill.className = 'pb-progress-fill' + (scanning ? ' scanning' : '');
   fill.style.width = pct + '%';
@@ -2956,6 +2963,8 @@ function pbPollScanResult(key) {
 }
 
 function pbShowClean(key) {
+  const otherMode = pbMode === 'sdk' ? 'storage' : 'sdk';
+  const otherLabel = pbMode === 'sdk' ? 'Storage mode' : 'SDK mode';
   document.getElementById('pbResult').innerHTML = `
     <div class="pb-result-clean">
       <div class="pb-result-icon">✅</div>
@@ -2967,11 +2976,16 @@ function pbShowClean(key) {
     <div class="pb-result-actions">
       <button class="pb-btn-primary" onclick="showToast('Payment submitted successfully!')">Submit Payment</button>
       <button class="pb-btn-ghost" onclick="resetPbState()">Upload Another</button>
+    </div>
+    <div style="text-align:center;margin-top:.6rem;font-size:.72rem;color:var(--steel)">
+      Try the same file in <a href="#" style="color:var(--blue);text-decoration:none;font-weight:600" onclick="event.preventDefault();setPbMode('${otherMode}')">${otherLabel} →</a>
     </div>`;
   document.getElementById('pbResult').classList.add('visible');
 }
 
 function pbShowThreat(threat) {
+  const otherMode = pbMode === 'sdk' ? 'storage' : 'sdk';
+  const otherLabel = pbMode === 'sdk' ? 'Storage mode' : 'SDK mode';
   document.getElementById('pbResult').innerHTML = `
     <div class="pb-result-threat">
       <div class="pb-result-icon">🚨</div>
@@ -2982,6 +2996,9 @@ function pbShowThreat(threat) {
     </div>
     <div class="pb-result-actions">
       <button class="pb-btn-ghost" onclick="resetPbState()">Try a Different File</button>
+    </div>
+    <div style="text-align:center;margin-top:.6rem;font-size:.72rem;color:var(--steel)">
+      Try the same file in <a href="#" style="color:var(--blue);text-decoration:none;font-weight:600" onclick="event.preventDefault();setPbMode('${otherMode}')">${otherLabel} →</a>
     </div>`;
   document.getElementById('pbResult').classList.add('visible');
 }
