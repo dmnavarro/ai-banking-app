@@ -1536,8 +1536,7 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
 
       <!-- SDK notice (hidden in storage mode) -->
       <div class="pb-sdk-notice" id="pbSdkNotice" style="display:none">
-        <strong>SDK mode</strong> scans files inline on the server before they are stored anywhere, using the Vision One File Security SDK. This requires the SDK to be installed and a valid API key configured.<br><br>
-        To enable SDK mode, install the Trend Micro File Security SDK and set <code>FSS_API_KEY</code> in your environment. <strong>Storage mode is available now</strong> and provides equivalent protection via S3.
+        <strong>SDK mode:</strong> The file is scanned <em>inline on the server</em> by the <strong>Vision One File Security SDK</strong> before it is stored anywhere. Threats are blocked instantly — nothing malicious ever reaches storage.
       </div>
 
       <!-- Drop zone -->
@@ -2508,22 +2507,7 @@ function addBlockedMsg(guardResult) {
       <div class="msg-time">${now12h()}</div>
     </div>`;
   msgs.appendChild(div);
-
-  // "THREAT INTERCEPTED" banner — appears below blocked card, auto-dismisses after 3s
-  const banner = document.createElement('div');
-  banner.className = 'threat-banner';
-  banner.innerHTML = `
-    <div class="threat-banner-icon">🚨</div>
-    <div class="threat-banner-text">
-      <div class="threat-banner-title">THREAT INTERCEPTED</div>
-      <div class="threat-banner-sub">${src}</div>
-    </div>`;
-  msgs.appendChild(banner);
   msgs.scrollTop = msgs.scrollHeight;
-  setTimeout(() => {
-    banner.style.animation = 'threatBannerOut .3s ease forwards';
-    setTimeout(() => banner.remove(), 320);
-  }, 3000);
 }
 
 function addScanningIndicator() {
@@ -2807,7 +2791,7 @@ function setPbMode(mode) {
   document.getElementById('pbModeSdk').classList.toggle('active', mode === 'sdk');
   document.getElementById('pbModeDesc').style.display  = mode === 'storage' ? '' : 'none';
   document.getElementById('pbSdkNotice').style.display = mode === 'sdk'     ? '' : 'none';
-  document.getElementById('pbDropzone').style.display  = mode === 'sdk'     ? 'none' : '';
+  document.getElementById('pbDropzone').style.display  = '';
   resetPbState();
 }
 
@@ -2855,9 +2839,11 @@ function handlePbFiles(files) {
   document.getElementById('pbProgress').classList.add('visible');
   document.getElementById('pbResult').classList.remove('visible');
   document.getElementById('pbResult').innerHTML = '';
-  setPbStage('Requesting secure upload URL…', 5);
-
-  if (pbMode === 'storage') {
+  if (pbMode === 'sdk') {
+    setPbStage('Reading file…', 5);
+    pbScanSdk(file);
+  } else {
+    setPbStage('Requesting secure upload URL…', 5);
     pbUploadStorage(file);
   }
 }
@@ -2905,6 +2891,39 @@ async function pbUploadStorage(file) {
     setPbStage('Vision One File Security scanning…', 70, true);
     pbPollScanResult(key);
 
+  } catch (e) {
+    pbShowError(e.message);
+  }
+}
+
+async function pbScanSdk(file) {
+  try {
+    // Read file as base64
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    setPbStage('Sending to Vision One File Security SDK…', 30);
+
+    const resp = await fetch('/api/bills/scan-sdk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: file.name, contentType: file.type, data: base64 }),
+    });
+
+    setPbStage('Scanning inline — no storage yet…', 65, true);
+
+    const result = await resp.json();
+    if (!resp.ok) return pbShowError(result.error || 'SDK scan failed.');
+
+    setPbStage('Scan complete', 100);
+    if (result.status === 'clean') {
+      pbShowClean(file.name);
+    } else {
+      pbShowThreat(result.threat || 'Malware detected');
+    }
   } catch (e) {
     pbShowError(e.message);
   }

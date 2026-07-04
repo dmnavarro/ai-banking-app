@@ -3,6 +3,7 @@ const path    = require('path');
 const { BedrockRuntimeClient, ConverseCommand } = require('@aws-sdk/client-bedrock-runtime');
 const { S3Client, GetObjectTaggingCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const { AmaasGrpcClient } = require('file-security-sdk');
 
 const app = express();
 app.use(express.json());
@@ -389,6 +390,39 @@ app.get('/api/bills/scan-result', async (req, res) => {
   } catch (e) {
     console.error('[FileScan] tag poll error:', e.message);
     res.status(502).json({ error: e.message });
+  }
+});
+
+// File Security SDK scan — inline scan before any storage
+app.post('/api/bills/scan-sdk', async (req, res) => {
+  const apiKey = (process.env.TMAS_API_KEY || '').trim();
+  if (!apiKey) return res.status(503).json({ error: 'TMAS_API_KEY not configured on this server.' });
+
+  const { filename, contentType, data } = req.body || {};
+  if (!filename || !data) return res.status(400).json({ error: 'filename and data are required.' });
+  if (!ALLOWED_TYPES.has(contentType)) return res.status(400).json({ error: 'File type not allowed.' });
+
+  const buffer = Buffer.from(data, 'base64');
+  if (buffer.length > MAX_SIZE_BYTES) return res.status(400).json({ error: 'File exceeds 10 MB limit.' });
+
+  const region = S3_REGION || 'ap-southeast-1';
+  const client = new AmaasGrpcClient(region, apiKey);
+  try {
+    console.log(`[FileScan SDK] scanning ${filename} (${buffer.length} bytes) region=${region}`);
+    const result = await client.scanBuffer(filename, buffer);
+    console.log(`[FileScan SDK] scanResult=${result.scanResult}`, result.foundMalwares);
+
+    if (result.scanResult === 0) {
+      res.json({ status: 'clean' });
+    } else {
+      const threat = result.foundMalwares?.[0]?.malwareName || 'Malware detected';
+      res.json({ status: 'threat', threat });
+    }
+  } catch (e) {
+    console.error('[FileScan SDK] error:', e.message);
+    res.status(502).json({ error: e.message });
+  } finally {
+    client.close();
   }
 });
 
