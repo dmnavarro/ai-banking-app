@@ -436,6 +436,12 @@ app.get('/', (_req, res) => {
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {
   console.log(`\n  Trend Bank running → http://localhost:${PORT}\n`);
+  try {
+    const ver = require('child_process').execSync('tmas version 2>&1', { encoding: 'utf8' }).trim();
+    console.log(`  TMAS: ${ver}`);
+  } catch (e) {
+    console.log(`  TMAS: not found (${e.message})`);
+  }
 });
 
 // Graceful shutdown — lets ECS drain connections quickly on SIGTERM
