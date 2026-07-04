@@ -164,13 +164,7 @@ Resources:
           - aws:forward_to_sfe
         StatefulEngineOptions:
           RuleOrder: STRICT_ORDER
-        StatefulRuleGroupReferences:
-          - ResourceArn: !Sub "arn:aws:network-firewall:${AWS::Region}:aws-managed:stateful-rulegroup/TrendAI-MalwareBlockStrictOrder"
-            Priority: 100
-          - ResourceArn: !Sub "arn:aws:network-firewall:${AWS::Region}:aws-managed:stateful-rulegroup/TrendAI-CVEClientBlockStrictOrder"
-            Priority: 200
-          - ResourceArn: !Sub "arn:aws:network-firewall:${AWS::Region}:aws-managed:stateful-rulegroup/TrendAI-CVEServerBlockStrictOrder"
-            Priority: 300
+        StatefulRuleGroupReferences: []
       Tags:
         - Key: Name
           Value: dgbank-ai-app-demo-fw-policy

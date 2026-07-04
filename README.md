@@ -42,7 +42,7 @@ These products protect the AWS infrastructure running this app. They are not int
 |---|---|
 | **Vision One Container Security** | Deployed on the ECS host to provide runtime container protection. Detects anomalous process execution, file system changes, and network behaviour inside the container — even if an attacker bypasses the application layer. |
 | **Vision One CREM (Cloud Risk and Exposure Management)** | Provides full visibility into the AWS environment — cloud asset inventory, misconfigurations, identity risk, and exposure scoring. Lets you show customers how Trend continuously assesses cloud risk beyond just workload protection. |
-| **Vision One Network Security — Cloud IPS** | Deployed inline on the VPC via AWS Network Firewall with TrendAI managed rule groups. Inspects all traffic to and from the ECS workload and blocks known exploit attempts, vulnerability scans, and malicious traffic at the network layer — complementing AI Guard which protects at the AI prompt layer. |
+| **Vision One Network Security — Cloud IPS** | Deployed inline on the VPC via AWS Network Firewall with AWS managed threat signature rule groups (malware, exploits, IOCs). Inspects all traffic to and from the ECS workload and blocks known exploit attempts, vulnerability scans, and malicious traffic at the network layer — complementing AI Guard which protects at the AI prompt layer. |
 
 ---
 
