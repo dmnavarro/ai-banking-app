@@ -338,7 +338,7 @@ app.get('/api/scanner/tmas/events/:jobId', (req, res) => {
 // ---------------------------------------------------------------------------
 // File Security — Pay Bills upload (Storage mode)
 // ---------------------------------------------------------------------------
-const ALLOWED_TYPES = new Set(['image/jpeg','image/png','image/webp','image/gif','application/pdf']);
+const ALLOWED_TYPES = new Set(['image/jpeg','image/png','image/webp','image/gif','application/pdf','text/plain']);
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 // Generate a presigned PUT URL so the browser uploads directly to S3

@@ -220,11 +220,16 @@ nav ul li.active a, nav ul li a:hover { color: var(--navy); border-bottom-color:
   border-radius: 99px;
   transition: width .4s ease;
 }
-@keyframes pbScanPulse {
-  0%, 100% { width: 72%; opacity: 1; }
-  50%       { width: 89%; opacity: .85; }
+@keyframes pbScanShimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
 }
-.pb-progress-fill.scanning { animation: pbScanPulse 1.8s ease-in-out infinite; transition: none; }
+.pb-progress-fill.scanning {
+  animation: pbScanShimmer 1.5s linear infinite;
+  background: linear-gradient(90deg, #10B981 35%, #34D399 50%, #10B981 65%);
+  background-size: 200% 100%;
+  transition: none;
+}
 .pb-progress-pct { font-size: .68rem; color: var(--steel); text-align: right; }
 
 /* Result */
@@ -1543,7 +1548,7 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
         <div class="pb-dropzone-icon">📄</div>
         <div class="pb-dropzone-title">Drop your bill or invoice here</div>
         <div class="pb-dropzone-sub">PDF, JPG, PNG, WEBP · max 10 MB · click to browse</div>
-        <input type="file" id="pbFileInput" accept=".pdf,image/*" onchange="handlePbFiles(this.files)">
+        <input type="file" id="pbFileInput" accept=".pdf,.txt,image/*" onchange="handlePbFiles(this.files)">
       </div>
 
       <!-- Progress -->
@@ -2818,6 +2823,7 @@ function resetPbState() {
 
 function pbFileIcon(type) {
   if (type === 'application/pdf')      return '📄';
+  if (type === 'text/plain')           return '📝';
   if (type.startsWith('image/'))       return '🖼️';
   return '📎';
 }
@@ -2832,7 +2838,7 @@ function handlePbFiles(files) {
   if (!files || !files.length) return;
   const file = files[0];
 
-  const allowed = ['image/jpeg','image/png','image/webp','image/gif','application/pdf'];
+  const allowed = ['image/jpeg','image/png','image/webp','image/gif','application/pdf','text/plain'];
   if (!allowed.includes(file.type)) {
     showToast('Only PDF and image files are accepted.');
     return;
@@ -2861,7 +2867,7 @@ function setPbStage(label, pct, scanning = false) {
   document.getElementById('pbProgressPct').textContent = Math.round(pct) + '%';
   const fill = document.getElementById('pbProgressFill');
   fill.className = 'pb-progress-fill' + (scanning ? ' scanning' : '');
-  if (!scanning) fill.style.width = pct + '%';
+  fill.style.width = pct + '%';
 }
 
 async function pbUploadStorage(file) {
