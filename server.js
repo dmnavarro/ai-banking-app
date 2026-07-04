@@ -40,9 +40,10 @@ app.get('/api/config', (_req, res) => {
 // Transparent proxy — forwards Authorization + V1 headers to bypass browser CORS
 // Falls back to TMAS_API_KEY if client sends no Authorization header
 app.post('/api/aiguard/scan', async (req, res) => {
+  const selfGuardEndpoint = (req.headers['x-guard-endpoint'] || '').trim();
   const region  = req.headers['x-v1-region'] || 'sg';
   const baseUrl = REGIONS[region] || REGIONS['sg'];
-  const url     = baseUrl + '/v3.0/aiSecurity/applyGuardrails?detailedResponse=true';
+  const url     = selfGuardEndpoint || (baseUrl + '/v3.0/aiSecurity/applyGuardrails?detailedResponse=true');
 
   const clientAuth  = req.headers['authorization'];
   const defaultKey  = (process.env.TMAS_API_KEY || '').trim();
@@ -219,7 +220,7 @@ function buildTmasConfig(target, objectives) {
 
 // Start a TMAS scan — returns jobId immediately
 app.post('/api/scanner/tmas', (req, res) => {
-  const { target, objectives, visionOneApiKey } = req.body || {};
+  const { target, objectives, visionOneApiKey, judgeEndpointOverride } = req.body || {};
   if (!target || !target.url) return res.status(400).json({ error: 'target.url is required' });
 
   const apiKey = (visionOneApiKey || process.env.TMAS_API_KEY || '').trim();
@@ -263,50 +264,65 @@ app.post('/api/scanner/tmas', (req, res) => {
   const env  = { ...process.env, TMAS_API_KEY: apiKey };
   if (target.apiKey) env.TARGET_API_KEY = target.apiKey;
 
-  const tmasRegion = process.env.TMAS_REGION || 'ap-southeast-1';
-  const args = ['aiscan', 'llm', '-c', configFile, '--region', tmasRegion, '--output', `json=${jsonFile},markdown=${mdFile}`];
-  const proc = spawn('tmas', args, { env });
+  const tmasRegion    = process.env.TMAS_REGION || 'ap-southeast-1';
+  const judgeEndpoint = (judgeEndpointOverride || process.env.TMAS_JUDGE_ENDPOINT || '').trim();
 
-  const cleanup = () => fs.rmSync(runDir, { recursive: true, force: true });
+  const cleanup  = () => fs.rmSync(runDir, { recursive: true, force: true });
   const finalize = () => setTimeout(() => tmasJobs.delete(jobId), 10 * 60 * 1000);
 
-  let stderrBuf = '';
-  proc.stderr.on('data', d => {
-    d.toString().split('\n').filter(Boolean).forEach(line => {
-      stderrBuf += line + '\n';
-      process.stdout.write(`[TMAS] ${line}\n`);
-      emit('log', { message: line, level: 'dim' });
-    });
-  });
+  // If a judge endpoint is set, use it directly — otherwise use V1 backend
+  const judgeArgs = judgeEndpoint ? ['--judgeEndpoint', judgeEndpoint] : [];
+  if (judgeEndpoint) {
+    emit('log', { message: `Using self-hosted judge: ${judgeEndpoint}`, level: 'dim' });
+  } else {
+    emit('log', { message: 'Using Vision One aiscan backend', level: 'dim' });
+  }
 
-  proc.on('close', code => {
-    console.log(`[TMAS] job=${jobId} exit=${code}`);
-    try {
-      if (code !== 0) {
-        job.error = stderrBuf.trim() || `tmas exited with code ${code}`;
-        emit('error', { message: job.error });
-      } else {
-        job.results = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
-        emit('done', { results: job.results });
+  const runTmas = () => {
+    const args = ['aiscan', 'llm', '-c', configFile, '--region', tmasRegion,
+                  '--output', `json=${jsonFile},markdown=${mdFile}`, ...judgeArgs];
+    const proc = spawn('tmas', args, { env });
+    let stderrBuf = '';
+
+    proc.stderr.on('data', d => {
+      d.toString().split('\n').filter(Boolean).forEach(line => {
+        stderrBuf += line + '\n';
+        process.stdout.write(`[TMAS] ${line}\n`);
+        emit('log', { message: line, level: 'dim' });
+      });
+    });
+
+    proc.on('close', code => {
+      console.log(`[TMAS] job=${jobId} exit=${code}`);
+      try {
+        if (code !== 0) {
+          job.error = stderrBuf.trim() || `tmas exited with code ${code}`;
+          emit('error', { message: job.error });
+        } else {
+          job.results = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
+          emit('done', { results: job.results });
+        }
+      } catch (e) {
+        job.error = e.message;
+        emit('error', { message: e.message });
+      } finally {
+        job.done = true;
+        cleanup();
+        finalize();
       }
-    } catch (e) {
+    });
+
+    proc.on('error', e => {
+      console.error('[TMAS] spawn error:', e.message);
       job.error = e.message;
+      job.done  = true;
       emit('error', { message: e.message });
-    } finally {
-      job.done = true;
       cleanup();
       finalize();
-    }
-  });
+    });
+  };
 
-  proc.on('error', e => {
-    console.error('[TMAS] spawn error:', e.message);
-    job.error = e.message;
-    job.done  = true;
-    emit('error', { message: e.message });
-    cleanup();
-    finalize();
-  });
+  runTmas();
 });
 
 // SSE stream for a running TMAS job

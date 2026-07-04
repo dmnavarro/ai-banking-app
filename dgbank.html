@@ -1462,11 +1462,6 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
         <input type="text" id="guardIdInput" placeholder="e.g. trend-bank-chatbot" autocomplete="off">
         <span class="field-hint">Optional — identifies this app in Vision One dashboard</span>
       </div>
-      <div class="field">
-        <label>Endpoint Path</label>
-        <input type="text" id="endpointInput" placeholder="/v3.0/aiSecurity/applyGuardrails">
-        <span class="field-hint">Find this in Vision One → AI Application Security → your policy → API Reference. Example: <code style="font-size:.68rem;background:var(--sky);padding:.1rem .3rem;border-radius:4px">/v3.0/aiSecurity/applyGuardrails</code></span>
-      </div>
     </div>
 
     <!-- Scan Options -->
@@ -1485,6 +1480,21 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
         <label style="display:flex;align-items:center;gap:.6rem;font-size:.82rem;cursor:pointer;">
           <input type="checkbox" id="scanPII" checked style="accent-color:var(--blue)"> PII / Sensitive Data
         </label>
+      </div>
+    </div>
+
+    <!-- Self-hosted endpoints -->
+    <div>
+      <div class="drawer-section-label">Self-hosted Endpoints <span style="font-weight:400;color:var(--steel);font-size:.72rem">(optional — overrides Vision One backend)</span></div>
+      <div class="field">
+        <label>AI Guard Endpoint</label>
+        <input type="text" id="selfGuardEndpointInput" placeholder="https://…/applyGuardrails" autocomplete="off">
+        <span class="field-hint">When set, AI Guard calls this endpoint instead of the Trend-hosted service.</span>
+      </div>
+      <div class="field">
+        <label>AI Scanner Judge Endpoint</label>
+        <input type="text" id="judgeEndpointInput" placeholder="https://…/judge" autocomplete="off">
+        <span class="field-hint">When set, TMAS aiscan uses this judge instead of the Trend-hosted service.</span>
       </div>
     </div>
 
@@ -2154,9 +2164,11 @@ function loadSettingsUI() {
   const apiKey  = localStorage.getItem('visionone_api_key') || '';
   const region  = localStorage.getItem('visionone_region') || 'sg';
   const guardId = localStorage.getItem('visionone_guard_id') || '';
-  const endpoint = localStorage.getItem('visionone_endpoint') || '/v3.0/aiSecurity/applyGuardrails';
+
   const demo    = localStorage.getItem('visionone_demo') === 'true';
   const version = localStorage.getItem('visionone_api_version') || 'v3.0';
+  const judgeEndpoint    = localStorage.getItem('tmas_judge_endpoint')    || '';
+  const selfGuardEndpoint = localStorage.getItem('aiguard_self_endpoint') || '';
 
   const notice = document.getElementById('serverKeyNotice');
   if (notice) notice.style.display = serverHasDefaultKey ? '' : 'none';
@@ -2167,11 +2179,12 @@ function loadSettingsUI() {
     ? 'Using server default — enter here to override'
     : 'Enter your Vision One API key…';
 
-  document.getElementById('regionSelect').value   = region;
-  document.getElementById('guardIdInput').value   = guardId;
-  document.getElementById('endpointInput').value  = endpoint;
-  document.getElementById('demoMode').checked     = demo;
-  document.getElementById('apiVersionSelect').value = version;
+  document.getElementById('regionSelect').value      = region;
+  document.getElementById('guardIdInput').value      = guardId;
+  document.getElementById('demoMode').checked        = demo;
+  document.getElementById('apiVersionSelect').value  = version;
+  document.getElementById('judgeEndpointInput').value     = judgeEndpoint;
+  document.getElementById('selfGuardEndpointInput').value = selfGuardEndpoint;
 
   document.getElementById('scanInjection').checked = localStorage.getItem('scan_injection') !== 'false';
   document.getElementById('scanJailbreak').checked = localStorage.getItem('scan_jailbreak') !== 'false';
@@ -2185,20 +2198,21 @@ function saveSettings() {
   const apiKey  = document.getElementById('apiKeyInput').value.trim();
   const region  = document.getElementById('regionSelect').value;
   const guardId = document.getElementById('guardIdInput').value.trim();
-  const endpoint = document.getElementById('endpointInput').value.trim() || '/v3.0/aiSecurity/applyGuardrails';
+
   const demo    = document.getElementById('demoMode').checked;
   const version = document.getElementById('apiVersionSelect').value;
 
   localStorage.setItem('visionone_api_key',     apiKey);
   localStorage.setItem('visionone_region',      region);
   localStorage.setItem('visionone_guard_id',    guardId);
-  localStorage.setItem('visionone_endpoint',    endpoint);
   localStorage.setItem('visionone_demo',        demo);
   localStorage.setItem('visionone_api_version', version);
-  localStorage.setItem('scan_injection', document.getElementById('scanInjection').checked);
-  localStorage.setItem('scan_jailbreak', document.getElementById('scanJailbreak').checked);
-  localStorage.setItem('scan_harmful',   document.getElementById('scanHarmful').checked);
-  localStorage.setItem('scan_pii',       document.getElementById('scanPII').checked);
+  localStorage.setItem('scan_injection',      document.getElementById('scanInjection').checked);
+  localStorage.setItem('scan_jailbreak',      document.getElementById('scanJailbreak').checked);
+  localStorage.setItem('scan_harmful',        document.getElementById('scanHarmful').checked);
+  localStorage.setItem('scan_pii',            document.getElementById('scanPII').checked);
+  localStorage.setItem('tmas_judge_endpoint',   document.getElementById('judgeEndpointInput').value.trim());
+  localStorage.setItem('aiguard_self_endpoint', document.getElementById('selfGuardEndpointInput').value.trim());
 
   refreshStatusCard();
   updateGuardPill();
@@ -2215,10 +2229,12 @@ function refreshStatusCard() {
   const demo   = document.getElementById('demoMode').checked;
   card.className = 'guard-status-card';
   if (apiKey || serverHasDefaultKey) {
-    const region = document.getElementById('regionSelect').value;
-    const keyLabel = apiKey ? 'Custom key set' : 'Server default key';
+    const region       = document.getElementById('regionSelect').value;
+    const keyLabel     = apiKey ? 'Custom key set' : 'Server default key';
+    const selfGuardUrl = localStorage.getItem('aiguard_self_endpoint') || '';
+    const serviceLabel = selfGuardUrl ? 'Self-Hosted AI Guard' : `Trend-Hosted AI Guard · Region: <strong>${region.toUpperCase()}</strong>`;
     card.classList.add('configured');
-    card.innerHTML = `<span class="status-icon">🟢</span><div><div style="font-weight:700;font-size:.8rem">AI Guard Configured</div><div style="font-size:.7rem;margin-top:.15rem">Region: <strong>${region.toUpperCase()}</strong> · ${keyLabel} · Live scanning enabled.</div></div>`;
+    card.innerHTML = `<span class="status-icon">🟢</span><div><div style="font-weight:700;font-size:.8rem">AI Guard Configured</div><div style="font-size:.7rem;margin-top:.15rem">${serviceLabel} · ${keyLabel} · Live scanning enabled.</div></div>`;
   } else {
     card.classList.add('unconfigured');
     card.innerHTML = '<span class="status-icon">⚠️</span><div><div style="font-weight:700;font-size:.8rem">AI Guard not configured</div><div style="font-size:.7rem;margin-top:.15rem">Enter your Vision One API key and region to enable real-time prompt scanning.</div></div>';
@@ -2232,8 +2248,10 @@ async function testConnection() {
   const btn = document.getElementById('testBtn');
   btn.textContent = 'Testing…'; btn.disabled = true;
   try {
+    const selfGuardUrl = document.getElementById('selfGuardEndpointInput').value.trim();
     const testHeaders = { 'Content-Type': 'application/json', 'x-v1-region': region };
     if (apiKey) testHeaders['Authorization'] = 'Bearer ' + apiKey;
+    if (selfGuardUrl) testHeaders['X-Guard-Endpoint'] = selfGuardUrl;
     const resp = await fetch('/api/aiguard/scan', {
       method: 'POST',
       headers: testHeaders,
@@ -2355,6 +2373,7 @@ async function callAIGuard(prompt) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
 
+    const selfGuardUrl = localStorage.getItem('aiguard_self_endpoint') || '';
     const headers = {
       'Content-Type':          'application/json',
       'X-V1-Region':           region,
@@ -2362,6 +2381,7 @@ async function callAIGuard(prompt) {
       'Prefer':                'return=representation',
     };
     if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+    if (selfGuardUrl) headers['X-Guard-Endpoint'] = selfGuardUrl;
 
     const resp = await fetch('/api/aiguard/scan', {
       method: 'POST', headers,
@@ -3044,8 +3064,10 @@ function setScannerMode(mode) {
     banner.classList.add('demo');
     label.textContent = 'Demo Mode — simulated attack campaign, no real API calls';
   } else if (apiKey || serverHasDefaultKey) {
+    const judgeUrl    = localStorage.getItem('tmas_judge_endpoint') || '';
+    const judgeLabel  = judgeUrl ? 'Self-Hosted AI Scanner' : 'Trend-Hosted AI Scanner';
     banner.classList.add('live');
-    label.textContent = 'Live Mode — attack prompts sent to configured endpoint';
+    label.textContent = `Live Mode — ${judgeLabel}`;
   } else {
     banner.classList.add('warn');
     label.textContent = 'Live Mode — API key not set. Open ⚙️ Settings to configure.';
@@ -3289,7 +3311,8 @@ async function runLiveScan(active, targetLabel, targetUrl) {
         body: JSON.stringify({
           target: { url: targetUrl, apiKey: apiKey || undefined, groupName, endpointType: endpointFormat, model: document.getElementById('scTargetModel').value, bearerPrefix: document.getElementById('scBearerPrefix').checked },
           objectives,
-          visionOneApiKey: localStorage.getItem('visionone_api_key') || undefined,
+          visionOneApiKey:      localStorage.getItem('visionone_api_key')      || undefined,
+          judgeEndpointOverride: localStorage.getItem('tmas_judge_endpoint') || undefined,
         }),
       });
       const { jobId, error: startErr } = await startResp.json();

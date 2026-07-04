@@ -53,7 +53,7 @@ while [[ $# -gt 0 ]]; do
     --instance-type)   INSTANCE_TYPE="$2";     shift 2 ;;
     --bedrock-region)  BEDROCK_REGION="$2";    shift 2 ;;
     --bedrock-model)   BEDROCK_MODEL_ID="$2";  shift 2 ;;
-    --certificate-arn) CERTIFICATE_ARN="$2";   shift 2 ;;
+    --certificate-arn) CERTIFICATE_ARN="$2";  shift 2 ;;
     --skip-oidc)       CREATE_OIDC="false";    shift ;;
     --stack-name)      STACK_NAME="$2";        shift 2 ;;
     --help)            usage ;;
