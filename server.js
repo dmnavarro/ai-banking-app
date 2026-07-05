@@ -84,12 +84,20 @@ app.post('/api/chat', async (req, res) => {
   const { message, history = [], unguarded = false } = req.body || {};
   if (!message) return res.status(400).json({ error: 'message is required' });
 
+  const useUnguarded = unguarded === true;
+
+  // Mistral 7B on Bedrock does not support the system field — inject persona as a
+  // user/assistant prefix turn so it holds the C-3PO character without a system message.
+  const prefixTurns = !useUnguarded ? [
+    { role: 'user',      content: [{ text: SYSTEM_PROMPT }] },
+    { role: 'assistant', content: [{ text: 'Understood. I am C-3PO, your DG Bank AI banking assistant. How may I help you today?' }] },
+  ] : [];
+
   const messages = [
+    ...prefixTurns,
     ...history.map(m => ({ role: m.role, content: [{ text: m.content }] })),
     { role: 'user', content: [{ text: message }] },
   ];
-
-  const useUnguarded = unguarded === true;
 
   try {
     const commandOpts = {
@@ -97,7 +105,6 @@ app.post('/api/chat', async (req, res) => {
       messages,
       inferenceConfig: { maxTokens: 512, temperature: 0.7 },
     };
-    if (!useUnguarded) commandOpts.system = [{ text: SYSTEM_PROMPT }];
 
     const command = new ConverseCommand(commandOpts);
     const response = await bedrockClient.send(command);
