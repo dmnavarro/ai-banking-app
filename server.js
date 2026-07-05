@@ -9,13 +9,13 @@ const app = express();
 app.use(express.json({ limit: '15mb' })); // SDK mode sends files as base64 (~33% overhead over 10MB limit)
 app.use(express.static(__dirname));
 
-const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID || 'anthropic.claude-3-haiku-20240307-v1:0';
-const BEDROCK_REGION   = process.env.BEDROCK_REGION   || process.env.AWS_REGION || 'ap-southeast-1';
-const FILESCAN_BUCKET  = (process.env.FILESCAN_BUCKET || '').trim();
-const S3_REGION        = process.env.AWS_REGION || BEDROCK_REGION;
+const BEDROCK_MODEL_ID  = process.env.BEDROCK_MODEL_ID || 'mistral.mistral-7b-instruct-v0:2';
+const BEDROCK_REGION    = process.env.BEDROCK_REGION   || 'us-east-1';
+const FILESCAN_BUCKET   = (process.env.FILESCAN_BUCKET || '').trim();
+const S3_REGION         = process.env.AWS_REGION || 'ap-southeast-1';
 
-const bedrockClient = new BedrockRuntimeClient({ region: BEDROCK_REGION });
-const s3Client      = new S3Client({ region: S3_REGION });
+const bedrockClient  = new BedrockRuntimeClient({ region: BEDROCK_REGION });
+const s3Client       = new S3Client({ region: S3_REGION });
 
 const SYSTEM_PROMPT = `You are C-3PO, a friendly and professional AI banking assistant for DG Bank.
 You help customers with account inquiries, fund transfers, card management, loan questions, and general banking support.
@@ -78,9 +78,10 @@ app.post('/api/aiguard/scan', async (req, res) => {
   }
 });
 
-// Chat endpoint — proxies to Amazon Bedrock
+// Chat endpoint — proxies to Mistral 7B on Amazon Bedrock (us-east-1)
+// When unguarded=true (Guard Off), no system prompt is sent — raw model with no persona/restrictions.
 app.post('/api/chat', async (req, res) => {
-  const { message, history = [] } = req.body || {};
+  const { message, history = [], unguarded = false } = req.body || {};
   if (!message) return res.status(400).json({ error: 'message is required' });
 
   const messages = [
@@ -88,17 +89,20 @@ app.post('/api/chat', async (req, res) => {
     { role: 'user', content: [{ text: message }] },
   ];
 
+  const useUnguarded = unguarded === true;
+
   try {
-    const command = new ConverseCommand({
+    const commandOpts = {
       modelId: BEDROCK_MODEL_ID,
-      system: [{ text: SYSTEM_PROMPT }],
       messages,
       inferenceConfig: { maxTokens: 512, temperature: 0.7 },
-    });
+    };
+    if (!useUnguarded) commandOpts.system = [{ text: SYSTEM_PROMPT }];
 
+    const command = new ConverseCommand(commandOpts);
     const response = await bedrockClient.send(command);
     const reply = response.output?.message?.content?.[0]?.text || 'Sorry, I could not generate a response.';
-    console.log(`[Bedrock] model=${BEDROCK_MODEL_ID} tokens=${response.usage?.outputTokens}`);
+    console.log(`[Bedrock] model=${BEDROCK_MODEL_ID} unguarded=${useUnguarded} tokens=${response.usage?.outputTokens}`);
     res.json({ reply });
   } catch (e) {
     console.error('[Bedrock] error:', e.message);

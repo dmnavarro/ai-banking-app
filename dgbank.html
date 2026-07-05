@@ -2586,12 +2586,12 @@ function addSystemMsg(text) {
 // Conversation history for multi-turn context (kept in memory per session)
 const chatHistory = [];
 
-async function callBedrock(message) {
+async function callBedrock(message, unguarded = false) {
   try {
     const resp = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, history: chatHistory }),
+      body: JSON.stringify({ message, history: chatHistory, unguarded }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || resp.statusText);
@@ -2640,7 +2640,7 @@ async function sendMessage() {
       addScannerNudge();
     } else {
       addTypingIndicator();
-      const reply = await callBedrock(text);
+      const reply = await callBedrock(text, !hasGuard);
       removeTypingIndicator();
       addBotMsg(reply, guardResult);
     }

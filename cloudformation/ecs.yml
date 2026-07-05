@@ -29,12 +29,12 @@ Parameters:
 
   BedrockRegion:
     Type: String
-    Default: ap-southeast-1
+    Default: us-east-1
     Description: AWS region for Bedrock API calls
 
   BedrockModelId:
     Type: String
-    Default: anthropic.claude-3-haiku-20240307-v1:0
+    Default: mistral.mistral-7b-instruct-v0:2
     Description: Bedrock foundation model ID
 
   CertificateArn:
@@ -388,6 +388,7 @@ Resources:
                   - bedrock:InvokeModel
                   - bedrock:InvokeModelWithResponseStream
                 Resource:
+                  - !Sub "arn:aws:bedrock:*::foundation-model/mistral.*"
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-haiku*"
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-haiku*"
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-sonnet*"
