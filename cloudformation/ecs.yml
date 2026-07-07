@@ -407,7 +407,7 @@ Resources:
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-haiku*"
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-sonnet*"
                   - !Sub "arn:aws:bedrock:*::foundation-model/deepseek.*"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.deepseek.*"
+                  - !Sub "arn:aws:bedrock:${BedrockRegion}:${AWS::AccountId}:inference-profile/us.deepseek.*"
         - PolicyName: dgbank-ai-app-demo-filescan-policy
           PolicyDocument:
             Version: "2012-10-17"
