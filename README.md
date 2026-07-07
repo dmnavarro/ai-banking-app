@@ -1,6 +1,6 @@
 # DG Bank — AI Banking Demo
 
-A fictional banking web app that demonstrates **TrendAI Vision One AI Application Security** (AI Guard + AI Scanner) and **Vision One Code Security** alongside **Amazon Bedrock** (Mistral 7B) in a realistic customer-facing scenario.
+A fictional banking web app that tells an end-to-end **TrendAI Vision One cloud & AI security story** — **AI Application Security** (AI Guard + AI Scanner), **File Security**, **Code Security**, and **Network Security (Cloud IPS)** — with **Container Security** and **CREM** protecting the demo infrastructure itself, all running against **Amazon Bedrock** (Mistral 7B) in a realistic customer-facing scenario.
 
 Built for Sales Engineers to deploy in their own AWS account and use during customer demos.
 
