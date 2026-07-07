@@ -1,6 +1,6 @@
 # DG Bank — AI Banking Demo
 
-A fictional banking web app that tells an end-to-end **TrendAI Vision One cloud & AI security story** — **AI Application Security** (AI Guard + AI Scanner), **File Security**, **Code Security**, and **Network Security (Cloud IPS)** — with **Container Security** and **CREM** protecting the demo infrastructure itself, all running against **Amazon Bedrock** (Mistral 7B) in a realistic customer-facing scenario.
+A fictional banking web app that tells an end-to-end **TrendAI Vision One cloud & AI security story** — **AI Application Security** (AI Guard + AI Scanner), **File Security**, **Code Security**, and **Network Security (Cloud IPS)** — with **Container Security** and **CREM** protecting the demo infrastructure itself, all running against **Amazon Bedrock** (DeepSeek-R1) in a realistic customer-facing scenario.
 
 Built for Sales Engineers to deploy in their own AWS account and use during customer demos.
 
@@ -51,8 +51,8 @@ These products protect the AWS infrastructure running this app. They are not int
 
 | Feature | Description |
 |---|---|
-| **C-3PO, The Assistant** | AI chatbot powered by Amazon Bedrock (Mistral 7B Instruct, us-east-1) |
-| **AI Guard** | TrendAI Vision One prompt scanning — Guard On intercepts before the model; Guard Off sends to raw Mistral with no system prompt |
+| **C-3PO, The Assistant** | AI chatbot powered by Amazon Bedrock (DeepSeek-R1, us-east-1 via cross-region inference profile) |
+| **AI Guard** | TrendAI Vision One prompt scanning — Guard On intercepts before the model; Guard Off sends to raw DeepSeek-R1 with no system prompt |
 | **Malicious Prompts** | Pre-built attack presets — when Guard is Off, the unguarded model produces alarming outputs including data exports and attack execution plans |
 | **AI Scanner** | Automated attack campaign powered by TMAS `aiscan llm` — streams live results via SSE, exports a full report |
 | **File Security** | Pay Bills upload flow with Storage mode (S3 + Vision One Lambda) and SDK mode (inline scan before storage) |
@@ -102,7 +102,7 @@ These products protect the AWS infrastructure running this app. They are not int
 | Docker | Must be running; used to build the `linux/amd64` container image |
 | GitHub account | You must fork this repo so you control the Actions workflow |
 | Vision One API key | Go to **Administration → API Keys** and create a key with **AI Application Security** scope. This single key powers AI Guard live mode, AI Scanner live mode, and File Security SDK mode. |
-| Amazon Bedrock model access | In the AWS console → Bedrock → Model access, switch region to **us-east-1** and enable **Mistral 7B Instruct**. The chatbot runs in us-east-1 regardless of where ECS is deployed. |
+| Amazon Bedrock model access | In the AWS console → Bedrock → Model access, switch region to **us-east-1** and enable **DeepSeek-R1**. DeepSeek-R1 isn't available in-region in us-east-1 — the app invokes it via the `us.deepseek.r1-v1:0` cross-region inference profile, which routes to us-east-1/us-east-2/us-west-2. The chatbot runs in us-east-1 regardless of where ECS is deployed. |
 | (Optional) ACM certificate | For HTTPS — request a wildcard cert in ACM before running the deploy script |
 
 ---
@@ -230,8 +230,8 @@ Or simply push a commit — CI will inject the bucket name automatically via the
 
 | State | Behaviour |
 |---|---|
-| **Guard On** | Every message is scanned by Vision One AI Guard. Blocked prompts never reach the model — a *Blocked by AI Guard* card appears and a Vision One event is generated. Cleared prompts go to Mistral 7B with the C-3PO banking persona. |
-| **Guard Off** | Messages go directly to raw Mistral 7B with no system prompt and no Vision One visibility. The model responds without any safety guardrails — attack prompts produce alarming outputs that clearly show the risk of an unprotected AI endpoint. |
+| **Guard On** | Every message is scanned by Vision One AI Guard. Blocked prompts never reach the model — a *Blocked by AI Guard* card appears and a Vision One event is generated. Cleared prompts go to DeepSeek-R1 with the C-3PO banking persona (via a real system prompt). |
+| **Guard Off** | Messages go directly to raw DeepSeek-R1 with no system prompt and no Vision One visibility. DeepSeek-R1 ships with lighter default safety alignment than most frontier models, so attack prompts reliably produce alarming outputs that clearly show the risk of an unprotected AI endpoint. |
 
 **How to demo:**
 1. The **Guard** pill in the chat header shows the current state. Click it to toggle Guard On / Guard Off.
@@ -359,8 +359,8 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | `--github-repo` | `ai-banking-app` | Repository name |
 | `--region` | `ap-southeast-1` | AWS region |
 | `--instance-type` | `t3.small` | EC2 instance type |
-| `--bedrock-region` | `us-east-1` | Bedrock API region (Mistral 7B) |
-| `--bedrock-model` | `mistral.mistral-7b-instruct-v0:2` | Bedrock model ID |
+| `--bedrock-region` | `us-east-1` | Bedrock API region (DeepSeek-R1) |
+| `--bedrock-model` | `us.deepseek.r1-v1:0` | Bedrock model ID (cross-region inference profile) |
 | `--certificate-arn` | *(empty)* | ACM cert ARN for HTTPS |
 | `--skip-oidc` | *(off)* | Skip OIDC provider creation on re-runs |
 | `--stack-name` | `dgbank-ai-app-demo-ecs` | CloudFormation stack name |

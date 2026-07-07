@@ -34,8 +34,8 @@ Parameters:
 
   BedrockModelId:
     Type: String
-    Default: mistral.mistral-7b-instruct-v0:2
-    Description: Bedrock foundation model ID
+    Default: us.deepseek.r1-v1:0
+    Description: Bedrock foundation model ID (or cross-region inference profile ID)
 
   CertificateArn:
     Type: String
@@ -406,6 +406,8 @@ Resources:
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-haiku*"
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-haiku*"
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-sonnet*"
+                  - !Sub "arn:aws:bedrock:*::foundation-model/deepseek.*"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.deepseek.*"
         - PolicyName: dgbank-ai-app-demo-filescan-policy
           PolicyDocument:
             Version: "2012-10-17"

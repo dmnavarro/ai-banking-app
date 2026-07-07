@@ -18,7 +18,7 @@ ECR_REPO="dgbank-ai-app-demo"
 REGION="ap-southeast-1"
 INSTANCE_TYPE="t3.small"
 BEDROCK_REGION="us-east-1"
-BEDROCK_MODEL_ID="mistral.mistral-7b-instruct-v0:2"
+BEDROCK_MODEL_ID="us.deepseek.r1-v1:0"
 CREATE_OIDC="true"
 GITHUB_ORG=""
 GITHUB_REPO="ai-banking-app"
@@ -35,8 +35,8 @@ Optional:
   --github-repo      GitHub repository name (default: ai-banking-app)
   --region           AWS region (default: ap-southeast-1)
   --instance-type    EC2 instance type (default: t3.small)
-  --bedrock-region   Bedrock API region (default: ap-southeast-1)
-  --bedrock-model    Bedrock model ID (default: anthropic.claude-3-haiku-20240307-v1:0)
+  --bedrock-region   Bedrock API region (default: us-east-1)
+  --bedrock-model    Bedrock model ID (default: us.deepseek.r1-v1:0)
   --certificate-arn  ACM certificate ARN for HTTPS (optional)
   --skip-oidc        Skip GitHub OIDC provider creation if it already exists
   --stack-name       CloudFormation stack name (default: dgbank-ai-app-demo-ecs)
