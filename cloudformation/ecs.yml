@@ -164,7 +164,21 @@ Resources:
           - aws:forward_to_sfe
         StatefulEngineOptions:
           RuleOrder: STRICT_ORDER
-        StatefulRuleGroupReferences: []
+        StatefulRuleGroupReferences:
+          # TrendAI Vision One Cloud IPS — partner-managed rule groups
+          # Remove the Override section on each to switch from alert-only to active blocking
+          - ResourceArn: !Sub "arn:aws:network-firewall:${AWS::Region}:partner-managed:stateful-rulegroup/TrendAI-CVEClientBlockStrictOrder"
+            Priority: 1
+            Override:
+              Action: DROP_TO_ALERT
+          - ResourceArn: !Sub "arn:aws:network-firewall:${AWS::Region}:partner-managed:stateful-rulegroup/TrendAI-CVEServerBlockStrictOrder"
+            Priority: 2
+            Override:
+              Action: DROP_TO_ALERT
+          - ResourceArn: !Sub "arn:aws:network-firewall:${AWS::Region}:partner-managed:stateful-rulegroup/TrendAI-MalwareBlockStrictOrder"
+            Priority: 3
+            Override:
+              Action: DROP_TO_ALERT
       Tags:
         - Key: Name
           Value: dgbank-ai-app-demo-fw-policy

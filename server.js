@@ -369,7 +369,12 @@ app.get('/api/scanner/tmas/events/:jobId', (req, res) => {
 // ---------------------------------------------------------------------------
 // File Security — Pay Bills upload (Storage mode)
 // ---------------------------------------------------------------------------
-const ALLOWED_TYPES = new Set(['image/jpeg','image/png','image/webp','image/gif','application/pdf','text/plain']);
+const ALLOWED_TYPES = new Set([
+  'image/jpeg','image/png','image/webp','image/gif',
+  'application/pdf','text/plain',
+  'application/zip','application/x-zip-compressed',
+  'application/octet-stream','application/x-msdownload',
+]);
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 // Generate a presigned PUT URL so the browser uploads directly to S3
@@ -453,6 +458,50 @@ app.post('/api/bills/scan-sdk', async (req, res) => {
     res.status(502).json({ error: e.message });
   } finally {
     client.close();
+  }
+});
+
+// Fetch a remote file server-side (bypasses browser CORS/download blocks)
+// Used for demo URLs like EICAR test files
+app.post('/api/bills/fetch-url', async (req, res) => {
+  const { url } = req.body || {};
+  if (!url) return res.status(400).json({ error: 'url is required' });
+
+  let parsed;
+  try { parsed = new URL(url); } catch { return res.status(400).json({ error: 'Invalid URL' }); }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    return res.status(400).json({ error: 'Only http/https URLs are allowed' });
+  }
+  // Block private/loopback ranges
+  const host = parsed.hostname.toLowerCase();
+  if (/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host) || host === '::1') {
+    return res.status(400).json({ error: 'Private network URLs are not allowed' });
+  }
+
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (DGBank-FileScanner/1.0)' },
+    });
+    if (!response.ok) {
+      return res.status(502).json({ error: `Remote server returned ${response.status}` });
+    }
+
+    const rawType = (response.headers.get('content-type') || 'application/octet-stream').split(';')[0].trim();
+    const contentType = rawType || 'application/octet-stream';
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    if (buffer.length > MAX_SIZE_BYTES) {
+      return res.status(400).json({ error: 'File exceeds 10 MB limit.' });
+    }
+
+    const filename = parsed.pathname.split('/').filter(Boolean).pop() || 'downloaded-file';
+    console.log(`[FileScan URL] fetched ${url} → ${filename} (${buffer.length} bytes, ${contentType})`);
+
+    res.json({ filename, contentType, size: buffer.length, data: buffer.toString('base64') });
+  } catch (e) {
+    console.error('[FileScan URL] fetch error:', e.message);
+    res.status(502).json({ error: e.message });
   }
 });
 
