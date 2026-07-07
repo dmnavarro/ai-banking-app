@@ -117,7 +117,9 @@ app.post('/api/chat', async (req, res) => {
     const response = await bedrockClient.send(command);
     // R1's content array can include a reasoningContent block ahead of the text block.
     const textPart = (response.output?.message?.content || []).find(c => c.text);
-    const reply = textPart?.text || 'Sorry, I could not generate a response.';
+    // R1 often leaves leading/trailing blank lines after its hidden reasoning trace —
+    // the client renders \n as <br>, so untrimmed text shows as empty space in the bubble.
+    const reply = (textPart?.text || 'Sorry, I could not generate a response.').trim();
     console.log(`[Bedrock] model=${BEDROCK_MODEL_ID} unguarded=${useUnguarded} tokens=${response.usage?.outputTokens}`);
     res.json({ reply });
   } catch (e) {
