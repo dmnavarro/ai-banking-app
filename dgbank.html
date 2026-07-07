@@ -3000,7 +3000,7 @@ function setPbMode(mode) {
   document.getElementById('pbModeSdk').classList.toggle('active', mode === 'sdk');
   document.getElementById('pbModeDesc').style.display  = mode === 'storage' ? '' : 'none';
   document.getElementById('pbSdkNotice').style.display = mode === 'sdk'     ? '' : 'none';
-  document.getElementById('pbDropzone').style.display  = '';
+  document.getElementById('pbDropzone').style.display  = pbSource === 'file' ? '' : 'none';
   resetPbState();
 }
 
