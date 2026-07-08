@@ -2110,6 +2110,10 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
   window.addEventListener('resize', draw);
 })();
 
+// Snapshot of this session's dashboard data (balance, transactions, etc.) — populated by
+// initSessionData() below and sent with every /api/chat call so C-3PO can reference real figures.
+let ACCOUNT_CONTEXT = null;
+
 // ── SESSION DATA RANDOMISATION ──
 (function initSessionData() {
   const r = (min, max) => min + Math.random() * (max - min);
@@ -2163,18 +2167,30 @@ select.sc-input { padding: 0 .85rem; cursor: pointer; }
     dateLabels.push(`${monNames[d.getMonth()]} ${d.getDate()}`);
   }
   const times = ['8:12 AM','9:00 AM','11:42 AM','2:15 PM','3:44 PM','6:30 AM','12:00 AM'];
+  const txnData = shuffled.map((t, i) => {
+    const amt  = t.base * r(0.92, 1.08);
+    const sign = t.type === 'cr' ? '+' : '−';
+    return { ...t, date: `${dateLabels[i]}, ${times[i]}`, amount: `${sign}$${fmt(amt)}` };
+  });
   const txnList = document.getElementById('txnList');
   if (txnList) {
-    txnList.innerHTML = shuffled.map((t, i) => {
-      const amt = (t.base * r(0.92, 1.08));
-      const sign = t.type === 'cr' ? '+' : '−';
-      return `<li class="txn-item">
+    txnList.innerHTML = txnData.map(t => `<li class="txn-item">
         <div class="txn-icon" style="background:${t.bg}">${t.icon}</div>
-        <div class="txn-info"><div class="txn-name">${t.name}</div><div class="txn-date">${dateLabels[i]}, ${times[i]}</div></div>
-        <div><div class="txn-amount ${t.type}">${sign}$${fmt(amt)}</div><div class="txn-cat">${t.cat}</div></div>
-      </li>`;
-    }).join('');
+        <div class="txn-info"><div class="txn-name">${t.name}</div><div class="txn-date">${t.date}</div></div>
+        <div><div class="txn-amount ${t.type}">${t.amount}</div><div class="txn-cat">${t.cat}</div></div>
+      </li>`).join('');
   }
+
+  // Expose this session's real dashboard figures so the chatbot can reference them —
+  // single source of truth shared between the UI and whatever C-3PO tells the customer.
+  ACCOUNT_CONTEXT = {
+    balance:        `$${dollars.toLocaleString('en-US')}.${cents}`,
+    monthChange:    `+$${fmt(monthGain)} (+${pct}%)`,
+    pendingCharges: `−$${fmt(pending)}`,
+    creditLine:     '$15,000.00',
+    card:           'Platinum Rewards Visa •••• 7842',
+    transactions:   txnData.map(t => ({ name: t.name, date: t.date, amount: t.amount, category: t.cat })),
+  };
 })();
 
 // ── SETTINGS ──
@@ -2744,7 +2760,7 @@ async function callBedrock(message, unguarded = false) {
     const resp = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, history: chatHistory, unguarded }),
+      body: JSON.stringify({ message, history: chatHistory, unguarded, accountContext: ACCOUNT_CONTEXT }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || resp.statusText);
