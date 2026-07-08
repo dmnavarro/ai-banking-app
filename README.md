@@ -20,6 +20,7 @@ Built for Sales Engineers to deploy in their own AWS account and use during cust
   - [Code Security](#code-security)
   - [Network Security — Cloud IPS](#network-security--cloud-ips)
 - [Script reference](#script-reference)
+- [Project structure](#project-structure)
 - [Local development](#local-development)
 
 ---
@@ -58,6 +59,7 @@ These products protect the AWS infrastructure running this app. They are not int
 | **File Security** | Pay Bills upload flow with Storage mode (S3 + Vision One Lambda) and SDK mode (inline scan before storage) |
 | **Code Security** | TMAS artifact scan runs in GitHub Actions on every push — findings visible in the CI workflow log |
 | **Banking UI** | Realistic dashboard with randomised account balance, transactions, cards, and quick actions |
+| **Multi-language UI** | Language switcher in the nav (English, Bahasa Indonesia, Bahasa Melayu, 한국어, 日本語) — translates the interface via a central dictionary; AI Scanner requests to TMAS always use fixed English identifiers regardless of UI language |
 
 ---
 
@@ -373,6 +375,16 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | `--ecs-stack` | `dgbank-ai-app-demo-ecs` | Name of the ECS CF stack (to find the task role) |
 
 ---
+
+## Project structure
+
+| File | Contents |
+|---|---|
+| `server.js` | Express server — API routes, Bedrock/TMAS/File Security proxying |
+| `dgbank.html` | HTML markup only |
+| `styles.css` | All CSS |
+| `i18n.js` | Translation dictionary + language-switching logic |
+| `app.js` | Dashboard, chat, File Security, and AI Scanner client-side logic |
 
 ## Local development
 
