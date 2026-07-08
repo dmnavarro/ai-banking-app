@@ -21,7 +21,7 @@ RUN apk add --no-cache curl tar && \
 COPY package*.json ./
 RUN npm ci --only=production
 
-COPY dgbank.html .
+COPY dgbank.html styles.css i18n.js app.js .
 COPY server.js .
 
 EXPOSE 3000
