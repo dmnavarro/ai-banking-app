@@ -616,6 +616,10 @@ Resources:
           Arn: !GetAtt ECSInstanceProfile.Arn
         SecurityGroupIds:
           - !Ref ECSInstanceSecurityGroup
+        MetadataOptions:
+          HttpEndpoint: enabled
+          HttpTokens: required            # IMDSv2 only
+          HttpPutResponseHopLimit: 1      # bridge-mode containers can't reach IMDS; tasks use the task role
         UserData:
           Fn::Base64: !Sub |
             #!/bin/bash
