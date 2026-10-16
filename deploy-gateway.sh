@@ -153,7 +153,8 @@ if [[ "$MODE" == "expose" ]]; then
 
   # Copy the gateway Service's selector and ports into a LoadBalancer Service.
   # The AWS Load Balancer Controller turns it into an internal NLB that only
-  # accepts traffic from inside the VPC.
+  # accepts traffic from inside the VPC. The manager port (readiness/admin)
+  # stays cluster-internal; the app only needs the LLM and MCP proxy ports.
   kubectl get svc "$GW_SVC" -n "$GW_NS" -o json | jq \
     --arg name "$LB_SERVICE_NAME" --arg cidr "$VPC_CIDR" '{
       apiVersion: "v1",
@@ -171,7 +172,7 @@ if [[ "$MODE" == "expose" ]]; then
         type: "LoadBalancer",
         selector: .spec.selector,
         loadBalancerSourceRanges: [$cidr],
-        ports: [.spec.ports[] | {name, port, targetPort, protocol}]
+        ports: [.spec.ports[] | select(.name != "manager") | {name, port, targetPort, protocol}]
       }
     }' | kubectl apply -f -
 

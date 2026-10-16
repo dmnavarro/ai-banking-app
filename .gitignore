@@ -2,3 +2,8 @@ node_modules/
 .env
 .DS_Store
 .claude/
+
+# AI Gateway Helm overrides from the Vision One console (contain the bootstrap token)
+overrides.yaml
+*overrides*.yaml
+*overrides*.yml
