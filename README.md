@@ -271,7 +271,23 @@ Creates an internal Network Load Balancer in front of the gateway's Service and 
 
 ### Step 4 — Verify
 
-**Management** in the console lists the instance with its version, last-seen time and status, and the AI Gateway dashboard loads with no errors.
+1. Gateway readiness — every module should report `"ready": true`:
+
+   ```bash
+   kubectl -n trendai-gateway port-forward svc/trendai-gateway-gateway 9090:9090 &
+   sleep 3; curl -s http://localhost:9090/readyz; echo
+   kill %1
+   ```
+
+2. The internal load balancer works from inside the VPC. Expect `401` — the gateway rejects calls without a virtual key. The NLB needs 2–3 minutes after `--expose` before its targets are healthy:
+
+   ```bash
+   kubectl run nlb-test --restart=Never --image=curlimages/curl -- \
+     curl -s -o /dev/null -w "%{http_code}\n" --max-time 10 http://<nlb-address>:8080/
+   sleep 15; kubectl logs nlb-test; kubectl delete pod nlb-test
+   ```
+
+3. **Management** in the console lists the instance with its version, last-seen time and status, and the AI Gateway dashboard loads with no errors.
 
 ### Tear down
 
