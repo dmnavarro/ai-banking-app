@@ -23,6 +23,7 @@ CREATE_OIDC="true"
 GITHUB_ORG=""
 GITHUB_REPO="ai-banking-app"
 CERTIFICATE_ARN=""
+GATEWAY_URL=""
 
 usage() {
   cat <<EOF
@@ -38,6 +39,7 @@ Optional:
   --bedrock-region   Bedrock API region (default: us-east-1)
   --bedrock-model    Bedrock model ID (default: us.deepseek.r1-v1:0)
   --certificate-arn  ACM certificate ARN for HTTPS (optional)
+  --gateway-url      AI Gateway LLM endpoint from deploy-gateway.sh --expose (optional)
   --skip-oidc        Skip GitHub OIDC provider creation if it already exists
   --stack-name       CloudFormation stack name (default: dgbank-ai-app-demo-ecs)
   --help             Show this help
@@ -54,6 +56,7 @@ while [[ $# -gt 0 ]]; do
     --bedrock-region)  BEDROCK_REGION="$2";    shift 2 ;;
     --bedrock-model)   BEDROCK_MODEL_ID="$2";  shift 2 ;;
     --certificate-arn) CERTIFICATE_ARN="$2";  shift 2 ;;
+    --gateway-url)     GATEWAY_URL="$2";       shift 2 ;;
     --skip-oidc)       CREATE_OIDC="false";    shift ;;
     --stack-name)      STACK_NAME="$2";        shift 2 ;;
     --help)            usage ;;
@@ -91,6 +94,23 @@ echo "ECR repo    : $ECR_URI"
 echo ""
 
 # ---------------------------------------------------------------------------
+# AI Gateway keys must exist before the task definition references them,
+# otherwise the ECS task fails to start
+# ---------------------------------------------------------------------------
+if [[ -n "$GATEWAY_URL" ]]; then
+  for param in /dgbank/gateway-key-assistant /dgbank/gateway-key-ops; do
+    if ! aws ssm get-parameter --name "$param" --region "$REGION" > /dev/null 2>&1; then
+      echo "Error: SSM parameter $param not found (required with --gateway-url)."
+      echo "Create it with:"
+      echo "  aws ssm put-parameter --name $param --type SecureString --value '<virtual key>' --region $REGION"
+      exit 1
+    fi
+  done
+  echo "AI Gateway  : $GATEWAY_URL (keys found in SSM)"
+  echo ""
+fi
+
+# ---------------------------------------------------------------------------
 # Step 1 — Ensure ECR repository exists
 # ---------------------------------------------------------------------------
 echo "Ensuring ECR repository exists..."
@@ -121,6 +141,11 @@ echo ""
 # ---------------------------------------------------------------------------
 # Step 3 — Deploy CloudFormation stack
 # ---------------------------------------------------------------------------
+# Only pass GatewayBaseUrl when --gateway-url is given, so a later run without
+# it keeps the value already on the stack
+GATEWAY_OVERRIDE=()
+[[ -n "$GATEWAY_URL" ]] && GATEWAY_OVERRIDE=(GatewayBaseUrl="$GATEWAY_URL")
+
 echo "Deploying CloudFormation stack: $STACK_NAME ..."
 aws cloudformation deploy \
   --stack-name "$STACK_NAME" \
@@ -135,7 +160,8 @@ aws cloudformation deploy \
     InstanceType="$INSTANCE_TYPE" \
     BedrockRegion="$BEDROCK_REGION" \
     BedrockModelId="$BEDROCK_MODEL_ID" \
-    CertificateArn="$CERTIFICATE_ARN" || true
+    CertificateArn="$CERTIFICATE_ARN" \
+    ${GATEWAY_OVERRIDE[@]+"${GATEWAY_OVERRIDE[@]}"} || true
 
 STACK_STATUS=$(aws cloudformation describe-stacks \
   --stack-name "$STACK_NAME" --region "$REGION" \

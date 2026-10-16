@@ -88,6 +88,7 @@ These products protect the AWS infrastructure running this app. They are not int
 - ECR Repository (created before the CF stack)
 - CloudWatch Log Group for container logs
 - SSM Parameter for TMAS API key (written by CI on first push, read by ECS at runtime)
+- (With `--gateway-url`) AI Gateway virtual keys read from SSM `/dgbank/gateway-key-assistant` and `/dgbank/gateway-key-ops`
 
 ### `deploy-filesecurity.sh` — File Security buckets (CloudFormation: `cloudformation/filesecurity-buckets.yaml`)
 
@@ -289,6 +290,34 @@ Creates an internal Network Load Balancer in front of the gateway's Service and 
 
 3. **Management** in the console lists the instance with its version, last-seen time and status, and the AI Gateway dashboard loads with no errors.
 
+### Step 5 — Identities and virtual keys
+
+In the console, under **Identity Management**:
+
+| Object | Name | Notes |
+|---|---|---|
+| Organization | DG Bank | Create first — teams need it |
+| Team | Retail Digital | Customer-facing assistant |
+| Team | Fraud and Ops | Back-office agent |
+| Identity (agent) | `c3po-assistant` | In Retail Digital; key alias `c3po-agent` |
+| Identity (agent) | `ops-analyst-agent` | In Fraud and Ops; key alias `ops-agent` |
+
+Each identity gets a virtual key (`sk_live_...`), shown once when created. Store both in SSM — never in the repo:
+
+```bash
+aws ssm put-parameter --region ap-southeast-1 --type SecureString --overwrite \
+  --name /dgbank/gateway-key-assistant --value '<c3po-agent key>'
+aws ssm put-parameter --region ap-southeast-1 --type SecureString --overwrite \
+  --name /dgbank/gateway-key-ops --value '<ops-agent key>'
+```
+
+Then point the app at the gateway (the LLM address from `--expose`). The ECS task gets `GATEWAY_BASE_URL`, `GATEWAY_KEY_ASSISTANT` and `GATEWAY_KEY_OPS`:
+
+```bash
+./deploy-ecs.sh --github-org <your-github-username> --skip-oidc \
+  --gateway-url http://<internal-nlb>:8080
+```
+
 ### Tear down
 
 ```bash
@@ -441,6 +470,7 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | `--bedrock-region` | `us-east-1` | Bedrock API region (DeepSeek-R1) |
 | `--bedrock-model` | `us.deepseek.r1-v1:0` | Bedrock model ID (cross-region inference profile) |
 | `--certificate-arn` | *(empty)* | ACM cert ARN for HTTPS |
+| `--gateway-url` | *(unchanged)* | AI Gateway LLM endpoint from `deploy-gateway.sh --expose`; needs the two `/dgbank/gateway-key-*` SSM parameters |
 | `--skip-oidc` | *(off)* | Skip OIDC provider creation on re-runs |
 | `--stack-name` | `dgbank-ai-app-demo-ecs` | CloudFormation stack name |
 

@@ -42,10 +42,19 @@ Parameters:
     Default: ""
     Description: ACM certificate ARN for HTTPS. Leave empty for HTTP only.
 
+  GatewayBaseUrl:
+    Type: String
+    Default: ""
+    Description: >
+      TrendAI AI Gateway LLM endpoint inside the VPC (printed by deploy-gateway.sh --expose),
+      e.g. http://<internal-nlb>:8080. Leave empty to deploy without the gateway. When set,
+      the SSM parameters /dgbank/gateway-key-assistant and /dgbank/gateway-key-ops must exist.
+
 
 Conditions:
   ShouldCreateOIDC: !Equals [!Ref CreateOIDCProvider, "true"]
   HasCertificate: !Not [!Equals [!Ref CertificateArn, ""]]
+  HasGateway: !Not [!Equals [!Ref GatewayBaseUrl, ""]]
 
 Resources:
 
@@ -530,9 +539,25 @@ Resources:
               Value: !Sub "dg-bank-scanning-${AWS::AccountId}-${AWS::Region}"
             - Name: AWS_REGION
               Value: !Ref AWS::Region
+            - !If
+              - HasGateway
+              - Name: GATEWAY_BASE_URL
+                Value: !Ref GatewayBaseUrl
+              - !Ref AWS::NoValue
           Secrets:
             - Name: TMAS_API_KEY
               ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/tmas-api-key"
+            # AI Gateway virtual keys, one per identity (c3po-assistant, ops-analyst-agent)
+            - !If
+              - HasGateway
+              - Name: GATEWAY_KEY_ASSISTANT
+                ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/gateway-key-assistant"
+              - !Ref AWS::NoValue
+            - !If
+              - HasGateway
+              - Name: GATEWAY_KEY_OPS
+                ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/gateway-key-ops"
+              - !Ref AWS::NoValue
           LogConfiguration:
             LogDriver: awslogs
             Options:
