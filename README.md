@@ -13,6 +13,7 @@ Built for Sales Engineers to deploy in their own AWS account and use during cust
 - [Resources deployed](#resources-deployed)
 - [Prerequisites](#prerequisites)
 - [Full deployment walkthrough](#full-deployment-walkthrough)
+- [AI Gateway cluster (private preview)](#ai-gateway-cluster-private-preview)
 - [Using the app](#using-the-app)
   - [AI Guard](#ai-guard)
   - [AI Scanner](#ai-scanner)
@@ -94,6 +95,19 @@ These products protect the AWS infrastructure running this app. They are not int
 - S3 Quarantine Bucket — clean vs. quarantined results tracked via S3 object tags
 - IAM Managed Policy for S3 access, attached to the ECS task role
 
+### `deploy-gateway.sh` — AI Gateway cluster (CloudFormation: `cloudformation/gateway-eks.yml`)
+
+Optional, separate from the main stack. Runs in the ECS stack's VPC and public subnets.
+
+- EKS cluster (Kubernetes API restricted with `--api-cidr`, API and audit logs on)
+- Managed node group — 1 × t3.large by default, Amazon Linux 2023, IMDSv2 only (hop limit 1)
+- EKS Pod Identity agent add-on
+- AWS Load Balancer Controller (Helm) + its IAM policy and Pod Identity role
+- Internal Network Load Balancer in front of the gateway (created by `--expose`, VPC CIDR only)
+- Cluster, node and controller IAM roles
+
+The gateway itself is installed by hand with the Helm command the Vision One console generates.
+
 ---
 
 ## Prerequisites
@@ -106,6 +120,7 @@ These products protect the AWS infrastructure running this app. They are not int
 | Vision One API key | Go to **Administration → API Keys** and create a key with **AI Application Security** scope. This single key powers AI Guard live mode, AI Scanner live mode, and File Security SDK mode. |
 | Amazon Bedrock model access | In the AWS console → Bedrock → Model access, switch region to **us-east-1** and enable **DeepSeek-R1**. DeepSeek-R1 isn't available in-region in us-east-1 — the app invokes it via the `us.deepseek.r1-v1:0` cross-region inference profile, which routes to us-east-1/us-east-2/us-west-2. The chatbot runs in us-east-1 regardless of where ECS is deployed. |
 | (Optional) ACM certificate | For HTTPS — request a wildcard cert in ACM before running the deploy script |
+| (AI Gateway only) kubectl, Helm, jq | Needed by `deploy-gateway.sh` and the console's Helm command |
 
 ---
 
@@ -219,6 +234,51 @@ Or simply push a commit — CI will inject the bucket name automatically via the
 | File Security SDK | File Security → SDK mode → drop a file or paste a URL → instant inline result |
 | Code Security | GitHub Actions → latest run → expand **Code Security Scan (TMAS)** step |
 | Network Firewall | Run `nikto -h <your-app-url>` → check Vision One → Network Security → Cloud IPS events |
+
+---
+
+## AI Gateway cluster (private preview)
+
+TrendAI AI Gateway runs in Kubernetes, not ECS, so it gets its own small EKS cluster inside the DG Bank VPC. The app reaches it through an internal load balancer; nothing about the gateway is exposed to the internet. Deploy the main ECS stack first.
+
+Running cost while it's up: EKS control plane (~$73/month), one t3.large node, and an internal NLB. Tear it down with `--delete` between demos.
+
+### Step 1 — Create the cluster
+
+```bash
+./deploy-gateway.sh --api-cidr "$(curl -s ifconfig.me)/32"
+```
+
+Takes ~15 minutes on the first run. When it finishes, `kubectl` already points at the new cluster and the AWS Load Balancer Controller is installed.
+
+### Step 2 — Install the gateway from the Vision One console
+
+1. Go to **AI Gateway → Management → Set up AI Gateway** and enter a name (45 characters max).
+2. Copy the generated Helm command, override file and bootstrap token. Keep the release name `trendai-gateway`.
+3. Run the Helm command in the same terminal.
+4. Check the pods start: `kubectl get pods -A`
+
+> Don't commit the override file — it contains your tenant's bootstrap token.
+
+### Step 3 — Expose the gateway inside the VPC
+
+```bash
+./deploy-gateway.sh --expose
+```
+
+Creates an internal Network Load Balancer in front of the gateway's Service and prints its address. Only addresses inside the VPC (the ECS app) can reach it. If the script can't find the Service, pass it explicitly: `--gateway-service <namespace>/<name>`.
+
+### Step 4 — Verify
+
+**Management** in the console lists the instance with its version, last-seen time and status, and the AI Gateway dashboard loads with no errors.
+
+### Tear down
+
+```bash
+./deploy-gateway.sh --delete
+```
+
+Removes the load balancer, the gateway release, the controller and the EKS stack. The ECS stack is untouched. Remove the instance from **Management** in the console as well.
 
 ---
 
@@ -373,6 +433,22 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 |---|---|---|
 | `--region` | `ap-southeast-1` | AWS region |
 | `--ecs-stack` | `dgbank-ai-app-demo-ecs` | Name of the ECS CF stack (to find the task role) |
+
+### `deploy-gateway.sh`
+
+| Option | Default | Description |
+|---|---|---|
+| `--expose` | *(off)* | After the console Helm install: add an internal NLB in front of the gateway |
+| `--delete` | *(off)* | Remove the NLB, gateway release, controller and EKS stack |
+| `--region` | `ap-southeast-1` | AWS region (must match the ECS stack) |
+| `--ecs-stack` | `dgbank-ai-app-demo-ecs` | Name of the ECS CF stack (to find the VPC and subnets) |
+| `--stack-name` | `dgbank-ai-gateway-eks` | CloudFormation stack name |
+| `--cluster-name` | `dgbank-ai-gateway` | EKS cluster name |
+| `--instance-type` | `t3.large` | Node instance type (`m6i.large` for steady, non-burst CPU) |
+| `--node-count` | `1` | Number of nodes |
+| `--k8s-version` | *(EKS default)* | Kubernetes version, e.g. `1.34` |
+| `--api-cidr` | `0.0.0.0/0` | CIDR allowed to reach the Kubernetes API |
+| `--gateway-service` | *(auto)* | `namespace/name` of the gateway Service, if `--expose` can't find it |
 
 ---
 
