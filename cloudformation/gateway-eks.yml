@@ -112,6 +112,26 @@ Resources:
         - !Ref LoadBalancerControllerPolicyArn
 
   # ---------------------------------------------------------------------------
+  # IAM — Amazon EBS CSI driver (via EKS Pod Identity)
+  # Creates the EBS volumes behind PersistentVolumeClaims, e.g. the gateway's Redis
+  # ---------------------------------------------------------------------------
+  EBSCSIDriverRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ClusterName}-ebs-csi-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: pods.eks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+              - sts:TagSession
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
+
+  # ---------------------------------------------------------------------------
   # EKS cluster
   # ---------------------------------------------------------------------------
   Cluster:
@@ -153,6 +173,15 @@ Resources:
       Namespace: kube-system
       ServiceAccount: aws-load-balancer-controller
       RoleArn: !GetAtt LoadBalancerControllerRole.Arn
+
+  EBSCSIDriverPodIdentity:
+    Type: AWS::EKS::PodIdentityAssociation
+    DependsOn: PodIdentityAgentAddon
+    Properties:
+      ClusterName: !Ref Cluster
+      Namespace: kube-system
+      ServiceAccount: ebs-csi-controller-sa
+      RoleArn: !GetAtt EBSCSIDriverRole.Arn
 
   # ---------------------------------------------------------------------------
   # Node group — launch template enforces IMDSv2 (same as the ECS instances)

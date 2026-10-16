@@ -103,8 +103,9 @@ Optional, separate from the main stack. Runs in the ECS stack's VPC and public s
 - Managed node group — 1 × t3.large by default, Amazon Linux 2023, IMDSv2 only (hop limit 1)
 - EKS Pod Identity agent add-on
 - AWS Load Balancer Controller (Helm) + its IAM policy and Pod Identity role
+- Amazon EBS CSI driver (Helm) + Pod Identity role, with an encrypted `gp3` default StorageClass — the gateway's bundled Redis keeps its catalog on an EBS volume
 - Internal Network Load Balancer in front of the gateway (created by `--expose`, VPC CIDR only)
-- Cluster, node and controller IAM roles
+- Cluster, node, load balancer controller and EBS CSI driver IAM roles
 
 The gateway itself is installed by hand with the Helm command the Vision One console generates.
 
@@ -241,7 +242,7 @@ Or simply push a commit — CI will inject the bucket name automatically via the
 
 TrendAI AI Gateway runs in Kubernetes, not ECS, so it gets its own small EKS cluster inside the DG Bank VPC. The app reaches it through an internal load balancer; nothing about the gateway is exposed to the internet. Deploy the main ECS stack first.
 
-Running cost while it's up: EKS control plane (~$73/month), one t3.large node, and an internal NLB. Tear it down with `--delete` between demos.
+Running cost while it's up: EKS control plane (~$73/month), one t3.large node, an internal NLB and a small gp3 volume for Redis. Tear it down with `--delete` between demos.
 
 ### Step 1 — Create the cluster
 
@@ -249,7 +250,7 @@ Running cost while it's up: EKS control plane (~$73/month), one t3.large node, a
 ./deploy-gateway.sh --api-cidr "$(curl -s ifconfig.me)/32"
 ```
 
-Takes ~15 minutes on the first run. When it finishes, `kubectl` already points at the new cluster and the AWS Load Balancer Controller is installed.
+Takes ~15 minutes on the first run. When it finishes, `kubectl` already points at the new cluster, and the AWS Load Balancer Controller and EBS CSI driver are installed.
 
 ### Step 2 — Install the gateway from the Vision One console
 
@@ -278,7 +279,7 @@ Creates an internal Network Load Balancer in front of the gateway's Service and 
 ./deploy-gateway.sh --delete
 ```
 
-Removes the load balancer, the gateway release, the controller and the EKS stack. The ECS stack is untouched. Remove the instance from **Management** in the console as well.
+Removes the load balancer, the gateway release and its Redis volume, both controllers and the EKS stack. The ECS stack is untouched. Remove the instance from **Management** in the console as well.
 
 ---
 
@@ -439,7 +440,7 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | Option | Default | Description |
 |---|---|---|
 | `--expose` | *(off)* | After the console Helm install: add an internal NLB in front of the gateway |
-| `--delete` | *(off)* | Remove the NLB, gateway release, controller and EKS stack |
+| `--delete` | *(off)* | Remove the NLB, gateway release and volumes, controllers and EKS stack |
 | `--region` | `ap-southeast-1` | AWS region (must match the ECS stack) |
 | `--ecs-stack` | `dgbank-ai-app-demo-ecs` | Name of the ECS CF stack (to find the VPC and subnets) |
 | `--stack-name` | `dgbank-ai-gateway-eks` | CloudFormation stack name |

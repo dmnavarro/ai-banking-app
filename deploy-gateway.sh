@@ -13,7 +13,9 @@ set -euo pipefail
 #   3. Deploy CloudFormation stack (EKS cluster, node group, IAM)
 #   4. Point kubectl at the cluster and wait for the node
 #   5. Install the AWS Load Balancer Controller (public Helm chart)
-#   6. Print the manual step: run the Helm command from the Vision One console
+#   6. Install the Amazon EBS CSI driver with a default gp3 StorageClass
+#      (the gateway's bundled Redis stores its data on a persistent volume)
+#   7. Print the manual step: run the Helm command from the Vision One console
 #
 # --expose finds the gateway's Service (Helm release "trendai-gateway") and
 # puts an internal Network Load Balancer in front of it, so the ECS app can
@@ -29,6 +31,7 @@ NODE_COUNT="1"
 K8S_VERSION=""
 PUBLIC_ACCESS_CIDR="0.0.0.0/0"
 LBC_CHART_VERSION=""                  # empty = latest eks/aws-load-balancer-controller chart
+EBS_CSI_CHART_VERSION=""              # empty = latest aws-ebs-csi-driver chart
 GATEWAY_RELEASE="trendai-gateway"
 GATEWAY_SERVICE=""                    # namespace/name, overrides auto-discovery in --expose
 LB_SERVICE_NAME="dgbank-ai-gateway-internal"
@@ -220,7 +223,14 @@ if [[ "$MODE" == "delete" ]]; then
     if [[ -n "$GW_RELEASE_NS" ]]; then
       echo "Uninstalling Helm release $GATEWAY_RELEASE ($GW_RELEASE_NS)..."
       helm uninstall "$GATEWAY_RELEASE" -n "$GW_RELEASE_NS" --wait || true
+      # Helm leaves StatefulSet volume claims behind. Delete them while the EBS
+      # CSI driver is still running so it removes the EBS volumes too.
+      echo "Deleting the gateway's persistent volumes..."
+      kubectl delete pvc --all -n "$GW_RELEASE_NS" --wait=true || true
     fi
+
+    echo "Uninstalling Amazon EBS CSI driver..."
+    helm uninstall aws-ebs-csi-driver -n kube-system --wait 2>/dev/null || true
 
     echo "Uninstalling AWS Load Balancer Controller..."
     helm uninstall aws-load-balancer-controller -n kube-system --wait 2>/dev/null || true
@@ -335,6 +345,46 @@ helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-contro
   --set serviceAccount.create=true \
   --set serviceAccount.name=aws-load-balancer-controller \
   --wait
+
+# ---------------------------------------------------------------------------
+# Step 6 — Amazon EBS CSI driver + default gp3 StorageClass
+# The controller can't read the region from instance metadata (hop limit 1),
+# so pass it explicitly. Volume claims created before this step (e.g. a Redis
+# claim stuck in Pending) pick up the new default class automatically.
+# ---------------------------------------------------------------------------
+helm repo add aws-ebs-csi-driver https://kubernetes-sigs.github.io/aws-ebs-csi-driver > /dev/null 2>&1 || true
+helm repo update aws-ebs-csi-driver > /dev/null
+
+EBS_CHART_ARGS=()
+[[ -n "$EBS_CSI_CHART_VERSION" ]] && EBS_CHART_ARGS=(--version "$EBS_CSI_CHART_VERSION")
+
+EBS_VALUES=$(mktemp)
+cat > "$EBS_VALUES" <<EOF
+controller:
+  region: $REGION
+  serviceAccount:
+    create: true
+    name: ebs-csi-controller-sa
+storageClasses:
+  - name: gp3
+    annotations:
+      storageclass.kubernetes.io/is-default-class: "true"
+    volumeBindingMode: WaitForFirstConsumer
+    reclaimPolicy: Delete
+    allowVolumeExpansion: true
+    parameters:
+      type: gp3
+      encrypted: "true"
+EOF
+
+echo "Installing Amazon EBS CSI driver..."
+helm upgrade --install aws-ebs-csi-driver aws-ebs-csi-driver/aws-ebs-csi-driver \
+  ${EBS_CHART_ARGS[@]+"${EBS_CHART_ARGS[@]}"} \
+  --namespace kube-system \
+  -f "$EBS_VALUES" \
+  --wait
+rm -f "$EBS_VALUES"
+kubectl get storageclass
 
 # ---------------------------------------------------------------------------
 # Done
