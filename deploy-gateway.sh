@@ -135,8 +135,11 @@ if [[ "$MODE" == "expose" ]]; then
   else
     echo "Looking for the gateway Service (Helm release: $GATEWAY_RELEASE)..."
     MATCHES=$(kubectl get svc -A -l "app.kubernetes.io/instance=$GATEWAY_RELEASE" -o json \
-      | jq -r '.items[] | select(.spec.selector != null and .metadata.name != "'"$LB_SERVICE_NAME"'")
-                        | "\(.metadata.namespace)/\(.metadata.name)"')
+      | jq -r --arg skip "$LB_SERVICE_NAME" '.items[]
+          | select(.spec.selector != null and .metadata.name != $skip)
+          | select(.metadata.labels["app.kubernetes.io/component"] != "redis")
+          | select(.metadata.name | test("redis") | not)
+          | "\(.metadata.namespace)/\(.metadata.name)"')
     COUNT=$(printf '%s' "$MATCHES" | grep -c . || true)
     if [[ "$COUNT" -ne 1 ]]; then
       echo "Error: expected one gateway Service, found $COUNT:"
