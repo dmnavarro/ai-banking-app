@@ -27,7 +27,7 @@ STACK_NAME="dgbank-ai-gateway-eks"
 ECS_STACK="dgbank-ai-app-demo-ecs"
 REGION="ap-southeast-1"
 CLUSTER_NAME="dgbank-ai-gateway"
-NODE_INSTANCE_TYPE="t3.xlarge"
+NODE_INSTANCE_TYPE="c7i.xlarge"
 NODE_COUNT="1"
 K8S_VERSION=""
 PUBLIC_ACCESS_CIDR="0.0.0.0/0"
@@ -54,7 +54,7 @@ Optional:
   --ecs-stack          Name of the ECS CF stack (default: dgbank-ai-app-demo-ecs)
   --stack-name         CloudFormation stack name (default: dgbank-ai-gateway-eks)
   --cluster-name       EKS cluster name (default: dgbank-ai-gateway)
-  --instance-type      Node instance type (default: t3.xlarge)
+  --instance-type      Node instance type (default: c7i.xlarge)
   --node-count         Number of nodes (default: 1)
   --k8s-version        Kubernetes version, e.g. 1.34 (default: current EKS default)
   --api-cidr           CIDR allowed to reach the Kubernetes API (default: 0.0.0.0/0)

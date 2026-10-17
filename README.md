@@ -101,7 +101,7 @@ These products protect the AWS infrastructure running this app. They are not int
 Optional, separate from the main stack. Runs in the ECS stack's VPC and public subnets.
 
 - EKS cluster (Kubernetes API restricted with `--api-cidr`, API and audit logs on)
-- Managed node group — 1 × t3.xlarge by default (4 vCPU / 16 GB), Amazon Linux 2023, IMDSv2 only (hop limit 1)
+- Managed node group — 1 × c7i.xlarge by default (4 vCPU / 8 GB), Amazon Linux 2023, IMDSv2 only (hop limit 1)
 - EKS Pod Identity agent add-on
 - AWS Load Balancer Controller (Helm) + its IAM policy and Pod Identity role
 - Amazon EBS CSI driver (Helm) + Pod Identity role, with an encrypted `gp3` default StorageClass — the gateway's bundled Redis keeps its catalog on an EBS volume
@@ -243,7 +243,7 @@ Or simply push a commit — CI will inject the bucket name automatically via the
 
 TrendAI AI Gateway runs in Kubernetes, not ECS, so it gets its own small EKS cluster inside the DG Bank VPC. The app reaches it through an internal load balancer; nothing about the gateway is exposed to the internet. Deploy the main ECS stack first.
 
-Running cost while it's up: EKS control plane (~$73/month), one t3.xlarge node, an internal NLB and a small gp3 volume for Redis. Tear it down with `--delete` between demos.
+Running cost while it's up: EKS control plane (~$73/month), one c7i.xlarge node, an internal NLB and a small gp3 volume for Redis. Tear it down with `--delete` between demos.
 
 ### Step 1 — Create the cluster
 
@@ -630,7 +630,7 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | `--ecs-stack` | `dgbank-ai-app-demo-ecs` | Name of the ECS CF stack (to find the VPC and subnets) |
 | `--stack-name` | `dgbank-ai-gateway-eks` | CloudFormation stack name |
 | `--cluster-name` | `dgbank-ai-gateway` | EKS cluster name |
-| `--instance-type` | `t3.xlarge` | Node instance type (`t3.large` is cheaper but leaves no room for rolling restarts; `m6i.xlarge` for steady, non-burst CPU) |
+| `--instance-type` | `c7i.xlarge` | Node instance type. Fast cores speed up guardrail scans; `m7i.xlarge` adds memory (16 GB); `t3.large` is cheaper but leaves no room for rolling restarts |
 | `--node-count` | `1` | Number of nodes |
 | `--k8s-version` | *(EKS default)* | Kubernetes version, e.g. `1.34` |
 | `--api-cidr` | `0.0.0.0/0` | CIDR allowed to reach the Kubernetes API |

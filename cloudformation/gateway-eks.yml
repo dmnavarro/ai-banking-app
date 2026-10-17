@@ -27,9 +27,11 @@ Parameters:
 
   NodeInstanceType:
     Type: String
-    Default: t3.xlarge
-    AllowedValues: [t3.large, t3.xlarge, m6i.large, m6i.xlarge, m7i.large]
-    Description: EC2 instance type for the gateway node (4 vCPU / 16 GB leaves room for rolling restarts)
+    Default: c7i.xlarge
+    AllowedValues: [t3.large, t3.xlarge, c7i.xlarge, m6i.large, m6i.xlarge, m7i.large, m7i.xlarge]
+    Description: >
+      EC2 instance type for the gateway node. c7i.xlarge (4 fast vCPU / 8 GB) speeds up
+      guardrail scans; m7i.xlarge has the same cores with 16 GB if memory gets tight.
 
   NodeCount:
     Type: Number
@@ -50,6 +52,7 @@ Parameters:
 
 Conditions:
   HasKubernetesVersion: !Not [!Equals [!Ref KubernetesVersion, ""]]
+  IsBurstable: !Equals [!Select [0, !Split [".", !Ref NodeInstanceType]], t3]
 
 Resources:
 
@@ -195,8 +198,10 @@ Resources:
           HttpEndpoint: enabled
           HttpTokens: required            # IMDSv2 only
           HttpPutResponseHopLimit: 1      # pods can't reach IMDS; AWS access goes through Pod Identity
-        CreditSpecification:
-          CpuCredits: unlimited           # t3: never throttled when burst credits run out
+        CreditSpecification: !If          # t3 only: never throttled when burst credits run out
+          - IsBurstable
+          - CpuCredits: unlimited
+          - !Ref AWS::NoValue
         TagSpecifications:
           - ResourceType: instance
             Tags:
