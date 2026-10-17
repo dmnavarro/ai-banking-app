@@ -591,19 +591,22 @@ function addBotMsg(text, guardResult) {
   const div = document.createElement('div');
   div.className = 'msg bot';
 
+  // The gateway's response guardrail masks sensitive values as [REDACTED] — make them visible
+  const redacted = /\[REDACTED\]/.test(text);
+
   let badge = '';
   if (guardResult) {
     if (guardResult.source === 'live')          badge = '<div><span class="guard-badge cleared">🛡️ AI Guard · Cleared</span></div>';
     else if (guardResult.source === 'demo')     badge = '<div><span class="guard-badge demo">🛡️ AI Guard · Demo mode</span></div>';
     else if (guardResult.source === 'fallback') badge = '<div><span class="guard-badge demo" title="Live API unavailable — using pattern matching">🛡️ AI Guard · Demo fallback</span></div>';
     else if (guardResult.source === 'off')      badge = '<div><span class="guard-badge unconfigured">🛡️ AI Guard · Off</span></div>';
-    else if (guardResult.source === 'gateway')  badge = `<div><span class="guard-badge gateway">🛰️ AI Gateway · Allowed${guardResult.model ? ' · ' + guardResult.model.replace(/</g,'&lt;') : ''}</span></div>`;
+    else if (guardResult.source === 'gateway')  badge = `<div><span class="guard-badge gateway">🛰️ AI Gateway · ${redacted ? 'Redacted' : 'Allowed'}${guardResult.model ? ' · ' + guardResult.model.replace(/</g,'&lt;') : ''}</span></div>`;
   }
 
   div.innerHTML = `
     <div class="bot-av-sm">C</div>
     <div>
-      <div class="msg-bubble">${text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}</div>
+      <div class="msg-bubble">${text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>').replace(/\[REDACTED\]/g,'<span class="redacted-tag">REDACTED</span>')}</div>
       ${badge}
       <div class="msg-time">${now12h()}</div>
     </div>`;
@@ -632,7 +635,9 @@ function addBlockedMsg(guardResult) {
   const header  = isGateway ? '🚫 Stopped by AI Gateway'
                 : guardResult.direction === 'response' ? '🚫 Response blocked by AI Guard'
                 : '🚫 Blocked by AI Guard';
-  const badge   = isGateway ? `🛰️ AI Gateway · ${guardResult.status ? 'HTTP ' + guardResult.status : 'Denied'}` : '🛡️ AI Guard · Blocked';
+  const badge   = !isGateway ? '🛡️ AI Guard · Blocked'
+                : guardResult.policy ? '🛰️ AI Gateway · Denied by policy'
+                : `🛰️ AI Gateway · ${guardResult.status ? 'HTTP ' + guardResult.status : 'Denied'}`;
   div.innerHTML = `
     <div class="bot-av-sm" style="background:linear-gradient(135deg,#991B1B,#C0394A)">${isGateway ? '🛰️' : '🛡️'}</div>
     <div>
@@ -641,7 +646,7 @@ function addBlockedMsg(guardResult) {
         <div style="font-size:.78rem;margin-bottom:.35rem">${(guardResult.details || `This message was blocked by TrendAI Vision One ${layer}.`).replace(/</g,'&lt;')}</div>
         <ul class="blocked-reasons">${reasons}</ul>
       </div>
-      <div><span class="guard-badge blocked">${badge}</span></div>
+      <div><span class="guard-badge blocked"${guardResult.rule ? ` title="${guardResult.rule.replace(/"/g,'&quot;').replace(/</g,'&lt;')}"` : ''}>${badge}</span></div>
       <div class="msg-time">${now12h()}</div>
     </div>`;
   msgs.appendChild(div);
@@ -821,6 +826,38 @@ async function callModel(message, unguarded = false) {
   }
 }
 
+// Turns an AI Gateway error into block-card fields. A guardrail denial looks like
+//   HTTP 400 { error: { message: "blocked by content policy: prompt_attack.default.classifier (high)", ... } }
+// and is shown as readable detector names; anything else (config errors, timeouts) is shown as is.
+const GATEWAY_DETECTOR_LABELS = {
+  prompt_attack: 'Prompt attack',
+  harmful: 'Harmful content', harmful_content: 'Harmful content',
+  sensitive: 'Sensitive data', sensitive_data: 'Sensitive data', pii: 'Sensitive data', dlp: 'Sensitive data',
+};
+
+function gatewayDenial(ge) {
+  const m = /blocked by content policy:\s*(.+)/i.exec(ge.message || '');
+  if (!m) {
+    return {
+      blocked: true, source: 'gateway', status: ge.status,
+      details: ge.message,
+      reasons: [ge.code || ge.type || `HTTP ${ge.status}`],
+    };
+  }
+  const reasons = m[1].split(/[,;]\s*/).filter(Boolean).map(rule => {
+    const r = /^([\w-]+)[\w.-]*\s*(?:\((\w+)\))?/.exec(rule.trim());
+    if (!r) return rule.trim();
+    const label = GATEWAY_DETECTOR_LABELS[r[1].toLowerCase()]
+      || r[1].replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+    return r[2] ? `${label} · ${r[2].toLowerCase()} confidence` : label;
+  });
+  return {
+    blocked: true, source: 'gateway', status: ge.status, policy: true,
+    details: 'This message matched the AI policy assigned at the gateway and was blocked.',
+    reasons, rule: m[1].trim(),
+  };
+}
+
 // App-side Guard also scans the model's reply, so the check covers both directions.
 // Only a live AI Guard verdict can block a reply — the demo pattern matcher is tuned for
 // attack prompts and would misfire on ordinary answers.
@@ -885,12 +922,7 @@ async function sendMessage() {
 
       if (result.gatewayError) {
         removeTypingIndicator();
-        const ge = result.gatewayError;
-        addBlockedMsg({
-          blocked: true, source: 'gateway', status: ge.status,
-          details: ge.message,
-          reasons: [ge.code || ge.type || `HTTP ${ge.status}`],
-        });
+        addBlockedMsg(gatewayDenial(result.gatewayError));
         return;
       }
 
