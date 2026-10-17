@@ -348,6 +348,13 @@ function updateGatewayPill() {
   const pill = document.getElementById('gatewayPill');
   if (!pill) return;
   const on = isGatewayOn();
+  // Which identity the gateway sees — only meaningful in Gateway mode
+  const idBadge = document.getElementById('chatIdentity');
+  if (idBadge) {
+    const id = chatIdentity();
+    idBadge.hidden = !on;
+    idBadge.innerHTML = on ? `as <b>${escHtml(identityLabel(id))}</b> · ${escHtml(IDENTITY_TEAMS[id] || '')}` : '';
+  }
   pill.className = 'chat-guard-pill';
   pill.innerHTML = `${GATEWAY_ICON} ${on ? t('chat.gatewayOn') : t('chat.gatewayOff')}`;
   if (!serverGateway.configured) {
@@ -1122,6 +1129,8 @@ document.getElementById('chatInput').addEventListener('keydown', e => {
 // and which layer decided it. Opened with the expand button in the chat header or ?view=demo.
 
 const IDENTITY_LABELS = { assistant: 'c3po-assistant', ops: 'ops-analyst-agent' };
+// Teams as set up in Identity Management (M1) — shown next to the identity in Gateway mode
+const IDENTITY_TEAMS  = { assistant: 'Retail Digital', ops: 'Fraud and Ops' };
 function identityLabel(id) { return IDENTITY_LABELS[id] || id; }
 
 // Tools (MCP banking tools): available when the server has a tools endpoint for the current route
@@ -1213,7 +1222,7 @@ function toggleTools() {
 function setChatIdentity(id) {
   if (!IDENTITY_LABELS[id]) return;
   sessionStorage.setItem('chat_identity', id);
-  updateDemoBar();
+  updateGuardPill();
 }
 
 // ── Trace store ──

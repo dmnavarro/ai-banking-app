@@ -695,6 +695,13 @@ nav ul li.active a, nav ul li a:hover { color: var(--navy); border-bottom-color:
 .chat-header-info { flex: 1; }
 .chat-agent-name { font-size: .875rem; font-weight: 700; color: #fff; }
 .chat-status { font-size: .68rem; color: rgba(255,255,255,.5); margin-top: .05rem; }
+.chat-identity[hidden] { display: none; }
+.chat-identity {
+  display: inline-block; margin-top: .3rem; padding: .12rem .5rem; border-radius: 99px;
+  font-size: .64rem; color: #BFDBFE; background: rgba(59,130,246,.18); border: 1px solid rgba(59,130,246,.35);
+}
+.chat-identity b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: #DBEAFE; }
+body.demo-mode .chat-identity { font-size: .76rem; }
 
 /* AI Guard status pill in header */
 .chat-guard-pill {

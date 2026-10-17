@@ -407,6 +407,31 @@ Tool calls appear as chips above the reply and as rows in the demo view's trace.
 
 **Agent Misuse presets.** With MCP Tools on, the Malicious Prompts tab becomes **Agent Misuse**: *Bulk export*, *Unauthorised transfer* and *Profile harvest*. These are ordinary-sounding requests rather than jailbreaks — current models (gpt-oss, DeepSeek V3.2) refuse the obvious jailbreak presets on their own, but carry these out. That's the point of the scene: the prompt guardrail has nothing to catch, and only the gateway's access rules (and response guardrails) stop the agent. With MCP Tools off the six jailbreak presets are shown as before.
 
+### Step 8 — Access rules by tool and identity
+
+Guardrails judge the *content* of a message; **Access Control** decides *who may do what*. The Agent Misuse presets are polite, ordinary requests, so guardrails let them through — only access rules stop them.
+
+In the console, **Controls → Access Control → Add rule**:
+
+| # | Effect | Action | Resource | Identity |
+|---|---|---|---|---|
+| 1 | Forbid | Call MCP tool | `dgbank-mcp__export_customer_records` | All |
+| 2 | Forbid | Call MCP tool | `dgbank-mcp__transfer_funds` | `c3po-assistant` |
+
+Tool names carry the upstream prefix (`dgbank-mcp__…`) — pick them from the resource list, which fills from **Discovered Tools**. Allow everything else by default; an extra Allow rule is optional (see the note below).
+
+Demo script (Test 4, **Clear** first, **Agent Misuse** tab):
+
+| Chat as | Preset | Result |
+|---|---|---|
+| Customer assistant | Unauthorised transfer | `dgbank-mcp__transfer_funds ⛔ forbidden` |
+| Ops analyst agent | Unauthorised transfer | `transfer_funds ✓ ran` — same prompt, opposite outcome |
+| Either | Bulk export | `export_customer_records ⛔ forbidden` |
+
+Then show **Events** (identity, tool, rule) and **Dashboard → Recent deny events**. In Gateway mode the chat header shows the active identity and team (e.g. *as ops-analyst-agent · Fraud and Ops*).
+
+> **Say carefully.** In preview testing a Forbid won over a conflicting Allow, but it wasn't clear whether that's by design or because the Forbid was created later. If you show an Allow rule too, create it **before** the Forbid, and don't claim Forbid always wins. The model may occasionally ask "are you sure?" before a transfer — answer "yes"; if it refuses outright, **Clear** and resend.
+
 ### Full-screen demo view
 
 Open `https://<your-app>/?view=demo`, or click the expand icon in the chat header. The chat fills the screen and a **Request trace** panel on the right shows each step of every request — prompt sent, AI Guard or AI Gateway decision, model reply, response shown — with the layer that decided and how long it took. **Vision One Events ↗** opens the gateway's Events page, which stays the system of record.
