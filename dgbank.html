@@ -1,12 +1,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DG Bank — Digital Banking</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%239E1B2E'/%3E%3Ctext x='32' y='42' font-family='Georgia,serif' font-size='28' font-weight='700' fill='white' text-anchor='middle'%3EDG%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='160' y2='160' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%23dd1500'/%3E%3Cstop offset='100%25' stop-color='%23ff8c00'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='160' height='160' rx='28' fill='url(%23g)'/%3E%3Cpath d='M 80 14 L 90 80 L 80 146 L 70 80 Z' fill='white'/%3E%3Cpath d='M 14 80 L 80 70 L 146 80 L 80 90 Z' fill='white' opacity='.9'/%3E%3Ccircle cx='80' cy='80' r='10' fill='url(%23g)'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="styles.css">
 
 <!-- ── SIDEBAR (desktop) ── -->
 <aside class="sidebar" aria-label="Main navigation">
-  <a href="#home" class="sb-brand" onclick="showView('home');return false;">
-    <span class="sb-logo">DG</span><span class="sb-name">DG Bank</span>
+  <!-- Original DG Bank logo, unchanged, on its own white panel -->
+  <a href="#home" class="sb-brand logo" onclick="showView('home');return false;">
+    <div class="logo-mark" style="background:none;padding:0;overflow:hidden;">
+      <svg width="34" height="34" viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="blazeGradNav" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#dd1500" />
+            <stop offset="100%" stop-color="#ff8c00" />
+          </linearGradient>
+          <clipPath id="badgeClipNav">
+            <rect x="0" y="0" width="160" height="160" rx="28" />
+          </clipPath>
+        </defs>
+        <rect x="0" y="0" width="160" height="160" rx="28" fill="url(#blazeGradNav)" />
+        <path d="M 80 14 L 90 80 L 80 146 L 70 80 Z" fill="white" clip-path="url(#badgeClipNav)" />
+        <path d="M 14 80 L 80 70 L 146 80 L 80 90 Z" fill="white" opacity="0.90" clip-path="url(#badgeClipNav)" />
+        <circle cx="80" cy="80" r="10" fill="url(#blazeGradNav)" clip-path="url(#badgeClipNav)" />
+      </svg>
+    </div>
+    <div><div class="logo-word">DG<span> Bank</span></div></div>
   </a>
   <nav class="sb-nav">
     <a href="#home" class="sb-item" data-nav="home" onclick="showView('home');return false;">
@@ -75,10 +93,10 @@
   <section class="view" data-view="home">
     <header class="home-head">
       <div class="home-who">
-        <span class="avatar m-only">TS</span>
+        <span class="avatar m-only">T</span>
         <div>
           <div class="home-tod" id="greetingHdr">Good evening</div>
-          <h1 class="home-name">Theo Santos</h1>
+          <h1 class="home-name">Theo</h1>
         </div>
       </div>
       <div class="home-tools m-only">
@@ -86,7 +104,7 @@
         <button class="icon-btn" onclick="showToast(t('toast.soon'))"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><span data-i18n="home.inbox">Inbox</span><i class="dot-red"></i></button>
         <button class="icon-btn" onclick="logOut()"><svg viewBox="0 0 24 24"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5"/><path d="m15 8 4 4-4 4M19 12H9"/></svg><span data-i18n="sb.logout">Log out</span></button>
       </div>
-      <span class="avatar d-only">TS</span>
+      <span class="avatar d-only">T</span>
     </header>
 
     <div class="home-grid">
@@ -197,7 +215,7 @@
 
   <!-- OFFERS (mobile "For you"; desktop shows offers on Home) -->
   <section class="view" data-view="offers" hidden>
-    <header class="page-head"><div><h1 data-i18n="offers.title">For you</h1><p class="page-sub" data-i18n="offers.sub">Offers for you</p></div><span class="avatar">TS</span></header>
+    <header class="page-head"><div><h1 data-i18n="offers.title">For you</h1><p class="page-sub" data-i18n="offers.sub">Offers for you</p></div><span class="avatar">T</span></header>
     <h2 class="block-title" data-i18n="home.offers">Offers</h2>
     <div class="offers-grid two" id="offersGridPage"></div>
   </section>
@@ -242,34 +260,18 @@
 
   <!-- SETTINGS (was the gear drawer; same fields and IDs) -->
   <section class="view" data-view="settings" hidden>
-    <header class="page-head"><div><h1 data-i18n="sb.settings">Settings</h1><p class="page-sub" data-i18n="set.sub">Demo controls for AI protection</p></div></header>
-    <div class="two-col">
-      <div class="panel-card">
-        <div class="panel-title-row"><h2 data-i18n="set.routing">Routing</h2></div>
-        <label class="switch-row"><div><b>AI Guard</b><span data-i18n="set.guardDesc">Scan prompts and replies, then call the model</span></div><input type="checkbox" class="switch" id="setGuard" onchange="setRouting('guard', this.checked)"></label>
-        <label class="switch-row"><div><b>AI Gateway</b><span data-i18n="set.gatewayDesc">Route model calls through the gateway</span></div><input type="checkbox" class="switch" id="setGateway" onchange="setRouting('gateway', this.checked)"></label>
-        <label class="switch-row"><div><b data-i18n="set.mcp">MCP tools</b><span data-i18n="set.mcpDesc">Let the assistant call banking tools</span></div><input type="checkbox" class="switch" id="setTools" onchange="setRouting('tools', this.checked)"></label>
-      </div>
-      <div class="panel-card">
-        <div class="panel-title-row"><h2 data-i18n="set.gwConn">Gateway connection</h2></div>
-        <div class="guard-status-card unconfigured" id="gatewayStatusCard">
-          <span class="status-icon">🛰️</span>
-          <div><div style="font-weight:700;font-size:.8rem">AI Gateway not configured</div></div>
-        </div>
-        <label class="fld"><span data-i18n="set.gwUrl">Gateway URL</span><input id="setGwUrl" readonly></label>
-        <label class="fld"><span data-i18n="set.vkey">Virtual key</span><input id="setGwKey" readonly value="Stored server-side (SSM)"></label>
-        <label class="fld"><span data-i18n="set.mcpUpstream">MCP upstream</span><input readonly value="dgbank-mcp · Streamable HTTP"></label>
-      </div>
-    </div>
-
+    <header class="page-head"><div><h1 data-i18n="settings.title">AI Application Security Configuration</h1><p class="page-sub" data-i18n="settings.subtitle">Vision One · AI Application Security</p></div></header>
     <div class="panel-card settings-card">
-      <div class="panel-title-row"><h2 data-i18n="settings.title">AI Application Security Configuration</h2><span class="muted small" data-i18n="settings.subtitle">Vision One · AI Application Security</span></div>
       <div class="guard-status-card unconfigured" id="guardStatusCard">
         <span class="status-icon">⚠️</span>
         <div>
           <div style="font-weight:700;font-size:.8rem">AI Guard not configured</div>
           <div style="font-size:.7rem;margin-top:.15rem">Enter your Vision One API key and region to enable real-time prompt scanning.</div>
         </div>
+      </div>
+      <div class="guard-status-card unconfigured" id="gatewayStatusCard">
+        <span class="status-icon">🛰️</span>
+        <div><div style="font-weight:700;font-size:.8rem">AI Gateway not configured</div></div>
       </div>
       <div class="settings-grid">
         <div>

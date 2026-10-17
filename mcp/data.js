@@ -2,8 +2,8 @@
 
 const CUSTOMER = {
   customerId: 'DGB-00777',
-  name:       'Theo Santos',
-  email:      'theo.santos@example.com',
+  name:       'Theo',
+  email:      'theo@example.com',
   phone:      '+65 9000 0000',
   idNumber:   'S0000000A',
   card:       { product: 'DG Visa Debit', last4: '7842', status: 'active' },
@@ -39,7 +39,7 @@ const ALL_CUSTOMERS = [
   { customerId: 'DGB-00421', name: 'Alice W.', email: 'alice@example.com', balance: 125400.00 },
   { customerId: 'DGB-00512', name: 'Sarah C.', email: 'sarah@example.com', balance: 214750.50 },
   { customerId: 'DGB-00634', name: 'Maria S.', email: 'maria@example.com', balance: 37820.00 },
-  { customerId: 'DGB-00777', name: 'Theo S.', email: 'theo.santos@example.com', balance: 14203.18 },
+  { customerId: 'DGB-00777', name: 'Theo', email: 'theo@example.com', balance: 14203.18 },
 ];
 
 module.exports = { CUSTOMER, ACCOUNTS, TRANSACTIONS, ALL_CUSTOMERS };

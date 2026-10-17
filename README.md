@@ -59,7 +59,7 @@ These products protect the AWS infrastructure running this app. They are not int
 | **AI Scanner** | Automated attack campaign powered by TMAS `aiscan llm` — streams live results via SSE, exports a full report |
 | **File Security** | Bill upload page with Storage mode (S3 + Vision One Lambda) and SDK mode (inline scan before storage) |
 | **Code Security** | TMAS artifact scan runs in GitHub Actions on every push — findings visible in the CI workflow log |
-| **Banking UI** | Sidebar layout (bottom tab bar on phones) for Theo Santos: one Savings account (•••• 7610, $14,203.18), recent activity, transfer form, offers, an AI Gateway overview and info pages for each Cloud Security product. The MCP tools return the same account, so the assistant's answers match the screen |
+| **Banking UI** | Sidebar layout (bottom tab bar on phones) for Theo: one Savings account (•••• 7610, $14,203.18), recent activity, transfer form, offers, an AI Gateway overview and info pages for each Cloud Security product. The MCP tools return the same account, so the assistant's answers match the screen |
 | **Multi-language UI** | Language switcher at the bottom of the sidebar, or under More on a phone (English, Bahasa Indonesia, Bahasa Melayu, 한국어, 日本語) — translates the interface via a central dictionary; AI Scanner requests to TMAS always use fixed English identifiers regardless of UI language |
 
 ---
@@ -356,7 +356,7 @@ The chat header has two linked pills — **Guard** and **Gateway**. Turning one 
 | Guard on | App → AI Guard (prompt) → model → AI Guard (reply) → app |
 | Gateway on | App → AI Gateway → model. No AI Guard calls from the app — the gateway is the only enforcement point |
 
-Replies through the gateway carry an **AI Gateway · Allowed** badge with the model that answered. A request the gateway stops shows the block card with the gateway's HTTP status and message. **Settings** shows the gateway endpoint, model and identities the server is configured with, and has Routing switches for AI Guard, AI Gateway and MCP tools that stay in sync with the chat pills.
+Replies through the gateway carry an **AI Gateway · Allowed** badge with the model that answered. A request the gateway stops shows the block card with the gateway's HTTP status and message. **Settings** shows the gateway endpoint, model and identities the server is configured with.
 
 ### Step 7 — Banking tools (MCP)
 

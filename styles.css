@@ -1585,7 +1585,7 @@ body.demo-mode .tool-chip { font-size: .82rem; }
 }
 body { background: var(--page); }
 /* Line icons in the new layout (existing chat/scanner icons keep their own attributes) */
-.sidebar svg, .tabbar svg, .app-main svg, .fs-wrap svg { stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sb-nav svg, .sb-foot svg, .tabbar svg, .app-main svg, .fs-wrap svg { stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 [hidden] { display: none !important; }
 .m-only { display: none !important; }
 
@@ -1595,7 +1595,7 @@ body { background: var(--page); }
   background: var(--sb-bg); color: #E9DFE0;
   display: flex; flex-direction: column; padding: 1.4rem 1rem 1.2rem;
 }
-.sb-brand { display: flex; align-items: center; gap: .7rem; text-decoration: none; padding: 0 .5rem 1.4rem; }
+.sb-brand { background: #fff; border-radius: 14px; padding: .65rem .85rem; margin: 0 .1rem 1.3rem; }
 .sb-logo {
   width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
   background: linear-gradient(135deg, var(--maroon-2), #7C1222); color: #fff;
@@ -1681,7 +1681,7 @@ body { background: var(--page); }
 .rose { background: #FDECEE; color: var(--maroon); } .indigo { background: #ECEEFF; color: #4651C9; }
 .mint { background: #E4F6EC; color: #12804E; } .sand { background: #FDF0E3; color: #B35A00; }
 
-.offers-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.offers-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
 .offers-grid.two { grid-template-columns: 1fr 1fr; }
 .offer {
   border: 0; cursor: pointer; text-align: left; border-radius: 20px; padding: 1.1rem 1.1rem 1rem; min-height: 132px;

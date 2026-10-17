@@ -7,7 +7,7 @@
 // One Savings account, the same figures the DG Bank MCP tools return (mcp/data.js), so the
 // assistant's answers always match the screen. Labels are re-resolved on every language switch.
 const ACCOUNT = {
-  holder:  'Theo Santos',
+  holder:  'Theo',
   number:  '•••• 7610',
   balance: 14203.18,
   rate:    '2.10% p.a.',
@@ -1316,7 +1316,7 @@ function showView(name) {
 
   if (name === 'scanner') prepareScanner();
   if (name === 'files' && leaving !== 'files') resetPbState();
-  if (name === 'settings') { loadSettingsUI(); syncAppChrome(); }
+  if (name === 'settings') loadSettingsUI();
   if (name === 'gateway') renderGatewayPage();
 
   currentView = name;
@@ -1340,27 +1340,9 @@ function submitTransfer(form) {
   form.reset();
 }
 
-// ── Routing switches (Settings page) mirror the chat pills and the demo bar ──
-function setRouting(kind, on) {
-  if (kind === 'guard'   && on !== isGuardOn())   toggleGuard();
-  if (kind === 'gateway' && on !== isGatewayOn()) toggleGateway();
-  if (kind === 'tools'   && on !== isToolsOn())   toggleTools();
-  syncAppChrome();
-}
-
 // Everything outside the chat that reflects the protection state; called from updateDemoBar()
 function syncAppChrome() {
   const hasKey = serverHasDefaultKey || !!localStorage.getItem('visionone_api_key');
-  const sw = (id, checked, enabled) => {
-    const el = document.getElementById(id);
-    if (el) { el.checked = checked; el.disabled = !enabled || scanning; }
-  };
-  sw('setGuard',   isGuardOn(),   hasKey);
-  sw('setGateway', isGatewayOn(), serverGateway.configured);
-  sw('setTools',   isToolsOn(),   toolsAvailable());
-  const gwUrl = document.getElementById('setGwUrl');
-  if (gwUrl) gwUrl.value = serverGateway.configured ? serverGateway.host : 'Not configured';
-
   const dot = (id, on) => { const el = document.getElementById(id); if (el) el.classList.toggle('on', on); };
   dot('dotGuard', hasKey);
   dot('dotGateway', !!serverGateway.configured);
@@ -1401,10 +1383,8 @@ function renderGatewayPage() {
 
 // ── Offers ──
 const OFFERS = [
-  { tone: 'crimson', title: 'offers.trial',   tag: 'offers.freeTrial',  action: () => showToast(t('offers.contactRep')) },
-  { tone: 'night',   title: 'offers.gateway', tag: 'offers.preview',    action: () => showView('gateway') },
-  { tone: 'blush',   title: 'offers.risk',    tag: 'offers.preview',    action: () => showToast(t('offers.contactRep')) },
-  { tone: 'forest',  title: 'offers.sales',   tag: 'offers.talkSales',  action: () => showToast(t('offers.contactRep')) },
+  { tone: 'crimson', title: 'offers.trial', tag: 'offers.freeTrial', action: () => showToast(t('offers.contactRep')) },
+  { tone: 'forest',  title: 'offers.sales', tag: 'offers.talkSales', action: () => showToast(t('offers.contactRep')) },
 ];
 function renderOffers() {
   const html = OFFERS.map((o, i) => `<button class="offer ${o.tone}" onclick="OFFERS[${i}].action()">
