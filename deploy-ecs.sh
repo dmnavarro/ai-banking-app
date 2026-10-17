@@ -162,9 +162,11 @@ echo ""
 # ---------------------------------------------------------------------------
 # Step 3 — Deploy CloudFormation stack
 # ---------------------------------------------------------------------------
-# Only pass the gateway / direct-model settings when their flags are given, so a
-# later run without them keeps the values already on the stack
+# Only pass the certificate / gateway / direct-model settings when their flags are
+# given, so a later run without them keeps the values already on the stack (an empty
+# CertificateArn would otherwise remove the HTTPS listener)
 GATEWAY_OVERRIDE=()
+[[ -n "$CERTIFICATE_ARN" ]] && GATEWAY_OVERRIDE+=(CertificateArn="$CERTIFICATE_ARN")
 [[ -n "$GATEWAY_URL" ]] && GATEWAY_OVERRIDE+=(GatewayBaseUrl="$GATEWAY_URL")
 [[ -n "$DIRECT_LLM_URL" ]] && GATEWAY_OVERRIDE+=(DirectLlmBaseUrl="$DIRECT_LLM_URL" DirectLlmModel="$DIRECT_LLM_MODEL")
 
@@ -182,7 +184,6 @@ aws cloudformation deploy \
     InstanceType="$INSTANCE_TYPE" \
     BedrockRegion="$BEDROCK_REGION" \
     BedrockModelId="$BEDROCK_MODEL_ID" \
-    CertificateArn="$CERTIFICATE_ARN" \
     ${GATEWAY_OVERRIDE[@]+"${GATEWAY_OVERRIDE[@]}"} || true
 
 STACK_STATUS=$(aws cloudformation describe-stacks \

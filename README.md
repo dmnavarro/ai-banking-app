@@ -509,7 +509,7 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | `--instance-type` | `t3.small` | EC2 instance type |
 | `--bedrock-region` | `us-east-1` | Bedrock API region (DeepSeek-R1) |
 | `--bedrock-model` | `us.deepseek.r1-v1:0` | Bedrock model ID (cross-region inference profile) |
-| `--certificate-arn` | *(empty)* | ACM cert ARN for HTTPS |
+| `--certificate-arn` | *(unchanged)* | ACM cert ARN for HTTPS. Pass it on the first deploy; later runs keep it |
 | `--gateway-url` | *(unchanged)* | AI Gateway LLM endpoint from `deploy-gateway.sh --expose`; needs the two `/dgbank/gateway-key-*` SSM parameters |
 | `--direct-llm-url` | *(unchanged)* | OpenAI-compatible base URL for the no-gateway route (e.g. `https://api.groq.com/openai`); needs SSM `/dgbank/direct-llm-key` |
 | `--direct-llm-model` | *(unchanged)* | Model for `--direct-llm-url`, e.g. `openai/gpt-oss-120b` |
