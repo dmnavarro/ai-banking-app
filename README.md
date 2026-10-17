@@ -494,7 +494,7 @@ All three use one identity, `engineer-laptop`.
 
 **1. In the console**, add the identity and its rules:
 - **Identities**: team *Engineering*, identity `engineer-laptop`, and a virtual key for it.
-- **Controls → Access Control**: allow the read-only tools (`get_balance`, `list_transactions`, `get_customer_profile`), forbid `transfer_funds` and `export_customer_records` for `engineer-laptop` (the existing forbid-export-for-all rule already covers the export).
+- **Controls → Access Control → Add rule**: Forbid · Call MCP tool · `dgbank-mcp__transfer_funds` · identity `engineer-laptop`. That is the only rule to add: tools nothing forbids are allowed (so the read-only tools work), and the existing forbid-export rule for All identities already covers `export_customer_records`.
 - The guardrail assignment `dgbank-ai-deny-enabled` covers all identities, so nothing to add there.
 
 **2. Store the key and build the desktop** (needs the ECS stack deployed with `--gateway-url` and `--gateway-mcp-url`; the script reads both from it):
