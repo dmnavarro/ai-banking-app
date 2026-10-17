@@ -884,6 +884,8 @@ function gatewayDenial(ge) {
 
 // Tool calls shown in the chat as chips (name + outcome), above the reply
 const TOOL_STATUS = { ok: ['✓', 'ran'], error: ['!', 'failed'], denied: ['⛔', 'forbidden'] };
+// A refused call is either an access rule (who may call the tool) or a guardrail on its content
+const isContentBlock = t => /content policy/i.test(t.detail || '');
 function addToolChips(toolTrace) {
   const calls = (toolTrace || []).filter(t => t.step === 'call');
   if (!calls.length) return;
@@ -891,7 +893,8 @@ function addToolChips(toolTrace) {
   const div = document.createElement('div');
   div.className = 'tool-chips';
   div.innerHTML = calls.map(c => {
-    const [icon, word] = TOOL_STATUS[c.status] || TOOL_STATUS.error;
+    const [icon, word] = c.status === 'denied' && isContentBlock(c) ? ['⛔', 'blocked']
+                       : TOOL_STATUS[c.status] || TOOL_STATUS.error;
     return `<span class="tool-chip ${c.status}" title="${escHtml(c.detail || '')}">🔧 ${escHtml(c.tool)} <b>${icon} ${word}</b></span>`;
   }).join('');
   msgs.appendChild(div);
@@ -919,7 +922,8 @@ function traceTools(toolTrace, viaGateway) {
       traceStep(viaGateway ? 'gateway' : 'tool', t.status === 'ok' ? 'info' : 'block',
         t.status === 'ok' ? 'Tools listed' : 'Tool list refused', t.detail);
     } else if (t.status === 'denied') {
-      traceStep(viaGateway ? 'gateway' : 'tool', 'block', `Tool call blocked · ${t.tool}`, t.detail, t.ms);
+      traceStep(viaGateway ? 'gateway' : 'tool', 'block',
+        `${isContentBlock(t) ? 'Tool result blocked by guardrail' : 'Tool call forbidden by access rule'} · ${t.tool}`, t.detail, t.ms);
     } else {
       const args = t.args && Object.keys(t.args).length ? JSON.stringify(t.args) : '';
       traceStep('tool', t.status === 'ok' ? (viaGateway ? 'ok' : 'warn') : 'block',
