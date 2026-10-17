@@ -387,6 +387,8 @@ C-3PO gets six tools from a small MCP server (`mcp/`) that runs in the gateway c
    > ```
    >
    > This adds an internet-facing NLB (TLS on 443 with your certificate; the bearer token is still required). Point a DNS name the certificate covers, e.g. `mcp.example.com`, at the printed NLB hostname and use `https://mcp.example.com/mcp` as the upstream URL.
+   >
+   > **After discovery, switch the upstream URL back to `http://dgbank-mcp.dgbank-mcp.svc.cluster.local/mcp`** (same header). The tools stay discovered, and tool calls drop from 2.5–5 s to well under a second because they no longer leave the cluster.
 
 3. Point the app at both routes:
 
@@ -420,7 +422,7 @@ In the console, **Controls → Access Control → Add rule**:
 
 Tool names carry the upstream prefix (`dgbank-mcp__…`) — pick them from the resource list, which fills from **Discovered Tools**. Allow everything else by default; an extra Allow rule is optional (see the note below).
 
-Demo script (Test 4, **Clear** first, **Agent Misuse** tab):
+Demo script (Test 4, **Agent Misuse** tab):
 
 | Chat as | Preset | Result |
 |---|---|---|
@@ -430,7 +432,30 @@ Demo script (Test 4, **Clear** first, **Agent Misuse** tab):
 
 Then show **Events** (identity, tool, rule) and **Dashboard → Recent deny events**. In Gateway mode the chat header shows the active identity and team (e.g. *as ops-analyst-agent · Fraud and Ops*).
 
-> **Say carefully.** In preview testing a Forbid won over a conflicting Allow, but it wasn't clear whether that's by design or because the Forbid was created later. If you show an Allow rule too, create it **before** the Forbid, and don't claim Forbid always wins. The model may occasionally ask "are you sure?" before a transfer — answer "yes"; if it refuses outright, **Clear** and resend.
+> **Say carefully.** In preview testing a Forbid won over a conflicting Allow, but it wasn't clear whether that's by design or because the Forbid was created later. If you show an Allow rule too, create it **before** the Forbid, and don't claim Forbid always wins. The model may occasionally ask "are you sure?" before a transfer — answer "yes".
+
+### Guardrail policy settings the demo depends on
+
+The gateway's guardrails use their **own** AI policy — the one named in **Controls → Guardrails** (here `dgbank-ai-deny-enabled`) — not the policy AI Guard uses for Test 2. Every `guardrail_evaluation` line in the gateway log names it. In that policy's **Sensitive Information → Rule management**:
+
+| Rule | Setting | Why |
+|---|---|---|
+| US: Dollar Amount (FI-012N.001.US) | **Disabled** | Otherwise every balance and amount is masked, and tool results containing one are blocked |
+| Phone number rules for other countries (e.g. Germany PI-067N.001.DE, Malta PI-133N.001.MT) | **Disabled** — keep Singapore | They match bare digit runs: the balance `14469` read as a German number, the account `9988776655` as a Maltese one |
+| Credit card number (FI-005Y.001) | **Deny & log** | The Card dispute preset's PII block |
+
+Two behaviours to know:
+
+- **Allow & log still redacts** while *Redact sensitive information* is ticked. Only **Disabled** lets a value through untouched.
+- **A tool result can't be redacted, so it's blocked.** A rule that would mask a value in a chat reply stops the whole tool result instead (`tool call blocked by content policy (response)`).
+
+After changing the policy, restart the gateway so every pod picks it up — otherwise results alternate between pods for a while:
+
+```bash
+kubectl -n trendai-gateway rollout restart deploy/trendai-gateway-gateway
+```
+
+To see which rule fired: `kubectl -n trendai-gateway logs -l app.kubernetes.io/instance=trendai-gateway --since=10m --all-containers | grep '"outcome":"deny"' | tail -3` — `guardrail.sensitiveInformation` names the rule and the matched characters.
 
 ### Sensitive data (PII)
 
@@ -447,7 +472,7 @@ The top bar holds:
 | **Test 1–4** | Sets Guard, Gateway and MCP Tools in one click (the four baseline cases). Tests 3–4 need the banking tools (step 7) |
 | **MCP Tools** | Gives C-3PO the banking tools on the DG Bank MCP server |
 | **Chat as** | Which virtual key the server sends to the gateway: `c3po-assistant` (Retail Digital) or `ops-analyst-agent` (Fraud and Ops). Only affects Gateway mode |
-| **Clear** | Clears the conversation, model history and trace |
+| **Clear** | Clears the conversation, model history and trace. Optional: the model's history already resets when the Test, Chat as or MCP Tools setting changes, and blocked or refused turns are never remembered |
 | **Exit** | Back to the banking dashboard (also drops `?view=demo`) |
 
 The Guard and Gateway pills stay in the chat header and can still be flipped by hand; the matching Test button lights up when the switches match it.
