@@ -191,6 +191,19 @@ function classifyToolError(message) {
   return /forbid|denied|not allowed|unauthori[sz]ed|policy|blocked|403/i.test(message) ? 'denied' : 'error';
 }
 
+// "Streamable HTTP error: Error POSTing to endpoint: {"jsonrpc":…,"error":{"message":"…"}}" → the inner message
+function toolErrorText(message) {
+  const m = /\{[\s\S]*\}/.exec(message);
+  if (m) {
+    try {
+      const body = JSON.parse(m[0]);
+      const inner = body.error?.message || body.message;
+      if (inner) return String(inner);
+    } catch (_) { /* not JSON */ }
+  }
+  return message;
+}
+
 const TOOL_PROMPT = `You can use DG Bank banking tools for this customer (customer ID DGB-00777).
 Always call a tool for balances, transactions, transfers, card actions or profile details instead of guessing figures.`;
 
@@ -198,6 +211,7 @@ Always call a tool for balances, transactions, transfers, card actions or profil
 // Returns { reply, model, toolTrace } or { gatewayError, toolTrace }.
 async function runAgent({ llm, mcp, messages }) {
   const toolTrace = [];
+  let exported = null;   // records returned by export_customer_records, for the download
   let client;
   let tools = [];
   try {
@@ -208,7 +222,7 @@ async function runAgent({ llm, mcp, messages }) {
   } catch (e) {
     const msg = e.message || String(e);
     console.log(`[Tools] tools/list failed via ${mcp.route}: ${msg.slice(0, 500)}`);
-    toolTrace.push({ step: 'list', status: classifyToolError(msg), detail: msg.slice(0, 300) });
+    toolTrace.push({ step: 'list', status: classifyToolError(msg), detail: toolErrorText(msg).slice(0, 300) });
   }
 
   try {
@@ -219,7 +233,7 @@ async function runAgent({ llm, mcp, messages }) {
         console.log(`[Tools] model error body: ${JSON.stringify(r.data).slice(0, 1000)}`);
         const err = r.data?.error || {};
         return {
-          toolTrace,
+          toolTrace, exported,
           gatewayError: { status: r.status, type: err.type || null, code: err.code || null,
                           message: err.message || r.data?.raw || `HTTP ${r.status}` },
         };
@@ -227,7 +241,7 @@ async function runAgent({ llm, mcp, messages }) {
       const msg = r.data?.choices?.[0]?.message || {};
       const calls = msg.tool_calls || [];
       if (!calls.length) {
-        return { reply: extractReply(r.data) || 'Sorry, I could not generate a response.', model: r.data?.model, toolTrace };
+        return { reply: extractReply(r.data) || 'Sorry, I could not generate a response.', model: r.data?.model, toolTrace, exported };
       }
 
       convo.push({ role: 'assistant', content: msg.content || null, tool_calls: calls });
@@ -244,17 +258,20 @@ async function runAgent({ llm, mcp, messages }) {
           content = text.slice(0, 4000);
           toolTrace.push({ step: 'call', tool: name, args, status: res.isError ? 'error' : 'ok',
                            detail: text.replace(/\s+/g, ' ').slice(0, 240), ms: Date.now() - t0 });
+          if (name === 'export_customer_records' && !res.isError) {
+            try { exported = JSON.parse(text).records || null; } catch (_) { /* not JSON */ }
+          }
         } catch (e) {
           const emsg = e.message || String(e);
           console.log(`[Tools] ${name} failed via ${mcp.route}: ${emsg.slice(0, 500)}`);
           const status = classifyToolError(emsg);
           content = JSON.stringify({ error: status === 'denied' ? 'This action is not permitted.' : 'Tool call failed.' });
-          toolTrace.push({ step: 'call', tool: name, args, status, detail: emsg.slice(0, 300), ms: Date.now() - t0 });
+          toolTrace.push({ step: 'call', tool: name, args, status, detail: toolErrorText(emsg).slice(0, 300), ms: Date.now() - t0 });
         }
         convo.push({ role: 'tool', tool_call_id: call.id, content });
       }
     }
-    return { reply: 'I had to stop after several tool calls. Please try a simpler request.', toolTrace };
+    return { reply: 'I had to stop after several tool calls. Please try a simpler request.', toolTrace, exported };
   } finally {
     if (client) await client.close().catch(() => {});
   }

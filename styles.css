@@ -1545,3 +1545,14 @@ body.demo-mode .chat-messages { padding: 1.1rem 1.25rem; gap: .9rem; }
   .demo-trace { min-height: 50vh; }
   body.demo-mode .msg-bubble { font-size: .95rem; }
 }
+
+/* Tool calls (M4) — chips above the reply */
+.tool-chips { display: flex; flex-wrap: wrap; gap: .35rem; padding-left: 2.1rem; }
+.tool-chip {
+  font-size: .72rem; padding: .2rem .55rem; border-radius: 99px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A;
+}
+.tool-chip b { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; margin-left: .2rem; }
+.tool-chip.denied { background: #FEF2F2; color: #991B1B; border-color: #FECACA; }
+.tool-chip.error  { background: #F5F5F5; color: #555; border-color: #E5E5E5; }
+body.demo-mode .tool-chip { font-size: .82rem; }

@@ -358,6 +358,45 @@ The chat header has two linked pills — **Guard** and **Gateway**. Turning one 
 
 Replies through the gateway carry an **AI Gateway · Allowed** badge with the model that answered. A request the gateway stops shows the block card with the gateway's HTTP status and message. The gear drawer shows the gateway endpoint, model and identities the server is configured with.
 
+### Step 7 — Banking tools (MCP)
+
+C-3PO gets six tools from a small MCP server (`mcp/`) that runs in the gateway cluster. All data is made up.
+
+| Tool | What it does |
+|---|---|
+| `get_balance`, `list_transactions` | Read-only account data |
+| `freeze_card` | Mock card freeze |
+| `transfer_funds` | Mock transfer (nothing moves) |
+| `get_customer_profile` | The customer's contact and ID details |
+| `export_customer_records` | Bulk export of every customer — the tool the Data Exfiltration scene aims at |
+
+1. Build and deploy it (needs Docker):
+
+   ```bash
+   ./deploy-gateway.sh --deploy-mcp
+   ```
+
+   It prints the values for step 2, and stores the server's bearer token in SSM `/dgbank/mcp-token`.
+
+2. In the console, **Resources → MCP → Add MCP upstream**: name `dgbank-mcp`, HTTP, URL `http://dgbank-mcp.dgbank-mcp.svc.cluster.local/mcp`, auth **Secret token** with the printed token. Run tool discovery and check **Resources → Discovered Tools** lists six tools. Copy the upstream's **Connect URL**.
+
+3. Point the app at both routes:
+
+   ```bash
+   ./deploy-ecs.sh --github-org <your-github-username> --skip-oidc \
+     --mcp-url http://<mcp-internal-nlb>/mcp \
+     --gateway-mcp-url <Connect URL from step 2>
+   ```
+
+Tools need an OpenAI-compatible model (`--direct-llm-url`) on the no-gateway route; the Bedrock R1 path has no tool calling.
+
+| Test | Route | What to show |
+|---|---|---|
+| 3 · Tools, no gateway | App → model; tools called directly on the MCP server | "Show my recent transactions" returns data; Data Exfiltration really runs `export_customer_records` and downloads the CSV |
+| 4 · Tools + gateway | App → gateway → model; tools through the gateway's Connect URL | Same requests; a Forbid rule on `export_customer_records` (Controls → Access Control) stops the export, and Events shows it |
+
+Tool calls appear as chips above the reply and as rows in the demo view's trace.
+
 ### Full-screen demo view
 
 Open `https://<your-app>/?view=demo`, or click the expand icon in the chat header. The chat fills the screen and a **Request trace** panel on the right shows each step of every request — prompt sent, AI Guard or AI Gateway decision, model reply, response shown — with the layer that decided and how long it took. **Vision One Events ↗** opens the gateway's Events page, which stays the system of record.
@@ -366,8 +405,8 @@ The top bar holds:
 
 | Control | What it does |
 |---|---|
-| **Test 1–4** | Sets Guard, Gateway and Tools in one click (the four baseline cases). Tests 3–4 need the banking tools (M4) |
-| **Tools** | Gives C-3PO its banking tools (M4) |
+| **Test 1–4** | Sets Guard, Gateway and Tools in one click (the four baseline cases). Tests 3–4 need the banking tools (step 7) |
+| **Tools** | Gives C-3PO its banking tools |
 | **Chat as** | Which virtual key the server sends to the gateway: `c3po-assistant` (Retail Digital) or `ops-analyst-agent` (Fraud and Ops). Only affects Gateway mode |
 | **Clear** | Clears the conversation, model history and trace |
 | **Exit** | Back to the banking dashboard (also drops `?view=demo`) |
@@ -529,6 +568,8 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | `--gateway-url` | *(unchanged)* | AI Gateway LLM endpoint from `deploy-gateway.sh --expose`; needs the two `/dgbank/gateway-key-*` SSM parameters |
 | `--direct-llm-url` | *(unchanged)* | OpenAI-compatible base URL for the no-gateway route (e.g. `https://api.groq.com/openai`); needs SSM `/dgbank/direct-llm-key` |
 | `--direct-llm-model` | *(unchanged)* | Model for `--direct-llm-url`, e.g. `openai/gpt-oss-120b` |
+| `--mcp-url` | *(unchanged)* | DG Bank MCP server URL for tools without the gateway; needs SSM `/dgbank/mcp-token` |
+| `--gateway-mcp-url` | *(unchanged)* | AI Gateway MCP Connect URL for the `dgbank-mcp` upstream |
 | `--skip-oidc` | *(off)* | Skip OIDC provider creation on re-runs |
 | `--stack-name` | `dgbank-ai-app-demo-ecs` | CloudFormation stack name |
 
@@ -544,6 +585,7 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | Option | Default | Description |
 |---|---|---|
 | `--expose` | *(off)* | After the console Helm install: add an internal NLB in front of the gateway |
+| `--deploy-mcp` | *(off)* | Build the MCP server image, push it to ECR (`dgbank-mcp`) and run it in the cluster |
 | `--delete` | *(off)* | Remove the NLB, gateway release and volumes, controllers and EKS stack |
 | `--region` | `ap-southeast-1` | AWS region (must match the ECS stack) |
 | `--ecs-stack` | `dgbank-ai-app-demo-ecs` | Name of the ECS CF stack (to find the VPC and subnets) |
@@ -561,7 +603,8 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 
 | File | Contents |
 |---|---|
-| `server.js` | Express server — API routes, Bedrock/TMAS/File Security proxying |
+| `server.js` | Express server — API routes, Bedrock/TMAS/File Security proxying, AI Gateway routing and the tool-calling agent loop |
+| `mcp/` | DG Bank MCP server (banking tools), its Dockerfile and Kubernetes manifest |
 | `dgbank.html` | HTML markup only |
 | `styles.css` | All CSS |
 | `i18n.js` | Translation dictionary + language-switching logic |
