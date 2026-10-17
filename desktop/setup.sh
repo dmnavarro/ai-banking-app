@@ -91,7 +91,6 @@ docker rm -f open-webui >/dev/null 2>&1 || true
 docker run -d --name open-webui --restart always -p 127.0.0.1:3000:8080 \
   -v open-webui:/app/backend/data \
   -e WEBUI_AUTH=False \
-  -e WEBUI_NAME="DG Bank Engineering Chat" \
   -e ENABLE_OLLAMA_API=False \
   -e OPENAI_API_BASE_URL="$GW_URL/v1" \
   -e OPENAI_API_KEY="$KEY" \
@@ -148,7 +147,7 @@ EOF
 # --password-store=basic: no "choose a password for the keyring" prompt on the shared desktop
 CHROME="google-chrome --no-first-run --no-default-browser-check --password-store=basic"
 shortcut hermes      "Hermes Agent"     "xfce4-terminal --title=Hermes --geometry=120x36 -x hermes" utilities-terminal
-shortcut open-webui  "DG Bank Engineering Chat" "$CHROME http://localhost:3000" google-chrome
+shortcut open-webui  "Open WebUI" "$CHROME http://localhost:3000" google-chrome
 shortcut vision-one  "Vision One Events" "$CHROME ${V1_EVENTS:-https://portal.sg.xdr.trendmicro.com/}" google-chrome
 # XFCE asks before running a launcher it hasn't seen; mark them trusted
 for f in "$DESK"/*.desktop; do

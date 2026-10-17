@@ -487,7 +487,7 @@ The new transactions are in the MCP server's data, so redeploy it once: `./deplo
 The **Laptop Agents** page shows the fourth use case: an engineer's own AI agent going through the same gateway. `deploy-desktop.sh` builds an Ubuntu desktop in the ECS stack's VPC (t3.large). SEs open it from the Laptop Agents page with an access code: the DG Bank app relays it at `/desktop/`, so they need no AWS access. The desktop has no public address; only the app's security group can reach it. On it:
 
 - **Hermes Agent** (terminal), with the gateway as its model provider (`dgbank-chat`) and the `dgbank-mcp` tools through the gateway's MCP Connect URL.
-- **DG Bank Engineering Chat**: Open WebUI, a ChatGPT-style app whose only model provider is the gateway.
+- **Open WebUI**: a ChatGPT-style app whose only model provider is the gateway.
 - Chrome with a **Vision One Events** shortcut.
 
 All three use one identity, `engineer-laptop`.
