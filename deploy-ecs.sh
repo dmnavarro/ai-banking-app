@@ -89,7 +89,7 @@ TEMPLATE="$SCRIPT_DIR/cloudformation/ecs.yml"
 # ---------------------------------------------------------------------------
 echo ""
 echo "Checking prerequisites..."
-for cmd in aws docker; do
+for cmd in aws docker jq; do
   if ! command -v "$cmd" &>/dev/null; then
     echo "Error: '$cmd' is not installed or not in PATH"
     exit 1
@@ -169,9 +169,16 @@ aws ecr get-login-password --region "$REGION" \
 echo "Building Docker image (linux/amd64)..."
 docker build --platform linux/amd64 -t "$ECR_REPO" "$SCRIPT_DIR"
 
-echo "Pushing image to ECR..."
+# Unique tag as well as :latest. The GitHub Actions deploy points the service at a
+# commit-SHA tag, so restarting on :latest would keep running that older image.
+IMAGE_TAG="$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo local)-$(date +%Y%m%d%H%M%S)"
+IMAGE_URI="$ECR_URI:$IMAGE_TAG"
+
+echo "Pushing image to ECR ($IMAGE_TAG)..."
 docker tag "$ECR_REPO:latest" "$ECR_URI:latest"
+docker tag "$ECR_REPO:latest" "$IMAGE_URI"
 docker push "$ECR_URI:latest"
+docker push "$IMAGE_URI"
 echo "Image pushed."
 echo ""
 
@@ -234,12 +241,26 @@ ECS_CLUSTER=$(get_output "ECSClusterName")
 ECS_SERVICE=$(get_output "ECSServiceName")
 
 # ---------------------------------------------------------------------------
-# Step 4 — Force ECS service to pick up the new image
+# Step 4 — Point the service at the new image
+# Copy the service's current task definition (whatever CloudFormation or the GitHub
+# Actions deploy last set, with all its environment and secrets) and swap only the image.
 # ---------------------------------------------------------------------------
+echo "Registering task definition with $IMAGE_TAG..."
+CURRENT_TD=$(aws ecs describe-services \
+  --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" --region "$REGION" \
+  --query "services[0].taskDefinition" --output text)
+NEW_TD=$(aws ecs describe-task-definition --task-definition "$CURRENT_TD" --region "$REGION" \
+  --query "taskDefinition" | jq --arg img "$IMAGE_URI" '
+    .containerDefinitions[0].image = $img |
+    del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)')
+NEW_TD_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TD" --region "$REGION" \
+  --query "taskDefinition.taskDefinitionArn" --output text)
+
 echo "Triggering ECS redeployment..."
 aws ecs update-service \
   --cluster "$ECS_CLUSTER" \
   --service "$ECS_SERVICE" \
+  --task-definition "$NEW_TD_ARN" \
   --force-new-deployment \
   --region "$REGION" \
   --output text --query "service.serviceName" > /dev/null
