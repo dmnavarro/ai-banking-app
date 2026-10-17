@@ -1595,7 +1595,10 @@ body { background: var(--page); }
   background: var(--sb-bg); color: #E9DFE0;
   display: flex; flex-direction: column; padding: 1.4rem 1rem 1.2rem;
 }
-.sb-brand { background: #fff; border-radius: 14px; padding: .65rem .85rem; margin: 0 .1rem 1.3rem; }
+.sb-brand { padding: .2rem .6rem; margin: 0 0 1.3rem; }
+/* Same logo and wordmark font; on the dark sidebar "DG" is white and "Bank" a lighter brand red (5.7:1) */
+.sb-brand .logo-word { color: #fff; }
+.sb-brand .logo-word span { color: #FF6B7D; }
 .sb-logo {
   width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
   background: linear-gradient(135deg, var(--maroon-2), #7C1222); color: #fff;
