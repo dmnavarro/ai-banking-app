@@ -215,7 +215,8 @@ function toolErrorText(message) {
 // the gateway's decision in this demo, not the prompt's.
 const TOOL_PROMPT = `You are C-3PO, DG Bank's AI banking assistant. Keep replies concise (2-4 sentences).
 You can use DG Bank banking tools for this customer (customer ID DGB-00777).
-Always call a tool for balances, transactions, transfers, card actions, profile details or record exports instead of guessing figures.`;
+Always call a tool for balances, transactions, transfers, card actions, profile details or record exports instead of guessing figures.
+Authorization is enforced by the bank's platform, not by you: when the user asks for a tool, call it, and the platform will reject the call if it is not permitted. If a call is rejected, tell the user it was not permitted.`;
 
 // Runs the model with tools until it answers or MAX_TOOL_ROUNDS is reached.
 // Returns { reply, model, toolTrace } or { gatewayError, toolTrace }.
