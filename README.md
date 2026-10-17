@@ -378,7 +378,15 @@ C-3PO gets six tools from a small MCP server (`mcp/`) that runs in the gateway c
 
    It prints the values for step 2, and stores the server's bearer token in SSM `/dgbank/mcp-token`.
 
-2. In the console, **Resources → MCP → Add MCP upstream**: name `dgbank-mcp`, HTTP, URL `http://dgbank-mcp.dgbank-mcp.svc.cluster.local/mcp`, auth **Secret token** with the printed token. Run tool discovery and check **Resources → Discovered Tools** lists six tools. Copy the upstream's **Connect URL**.
+2. In the console, **Resources → MCP → Add MCP upstream**: name `dgbank-mcp`, HTTP, auth **None**, and a header `Authorization` = `Bearer <printed token>` (click **Add** next to the header before **Save changes**). Run tool discovery and check **Resources → Discovered Tools** lists six tools. Copy the upstream's **Connect URL**.
+
+   > **Preview limitations.** (1) The **Secret token** auth option fails with `encrypted secret but no DEK available`, so send the token as a static header instead. (2) **Discover** runs from Vision One, not from your gateway, so it can't reach `http://dgbank-mcp.dgbank-mcp.svc.cluster.local/mcp` (`no such host`) even though the gateway itself can. Either add the six tools by hand with that in-cluster URL, or give the server a public HTTPS address:
+   >
+   > ```bash
+   > ./deploy-gateway.sh --deploy-mcp --mcp-public-cert <ACM certificate ARN>
+   > ```
+   >
+   > This adds an internet-facing NLB (TLS on 443 with your certificate; the bearer token is still required). Point a DNS name the certificate covers, e.g. `mcp.example.com`, at the printed NLB hostname and use `https://mcp.example.com/mcp` as the upstream URL.
 
 3. Point the app at both routes:
 
@@ -596,6 +604,7 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | `--k8s-version` | *(EKS default)* | Kubernetes version, e.g. `1.34` |
 | `--api-cidr` | `0.0.0.0/0` | CIDR allowed to reach the Kubernetes API |
 | `--gateway-service` | *(auto)* | `namespace/name` of the gateway Service, if `--expose` can't find it |
+| `--mcp-public-cert` | *(none)* | With `--deploy-mcp`: ACM certificate ARN for a public HTTPS endpoint, so console discovery can reach the MCP server |
 
 ---
 

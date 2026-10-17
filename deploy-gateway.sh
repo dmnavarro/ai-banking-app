@@ -36,6 +36,7 @@ EBS_CSI_CHART_VERSION=""              # empty = latest aws-ebs-csi-driver chart
 GATEWAY_RELEASE="trendai-gateway"
 GATEWAY_SERVICE=""                    # namespace/name, overrides auto-discovery in --expose
 LB_SERVICE_NAME="dgbank-ai-gateway-internal"
+MCP_PUBLIC_CERT=""                    # ACM cert ARN: also expose the MCP server publicly over HTTPS
 MODE="deploy"
 
 usage() {
@@ -58,6 +59,8 @@ Optional:
   --k8s-version        Kubernetes version, e.g. 1.34 (default: current EKS default)
   --api-cidr           CIDR allowed to reach the Kubernetes API (default: 0.0.0.0/0)
   --gateway-service    namespace/name of the gateway Service, if --expose can't find it
+  --mcp-public-cert    With --deploy-mcp: ACM certificate ARN; adds an internet-facing HTTPS
+                       load balancer so the console's MCP tool discovery can reach the server
   --help               Show this help
 EOF
   exit 0
@@ -77,6 +80,7 @@ while [[ $# -gt 0 ]]; do
     --k8s-version)     K8S_VERSION="$2";          shift 2 ;;
     --api-cidr)        PUBLIC_ACCESS_CIDR="$2";   shift 2 ;;
     --gateway-service) GATEWAY_SERVICE="$2";      shift 2 ;;
+    --mcp-public-cert) MCP_PUBLIC_CERT="$2";      shift 2 ;;
     --help)            usage ;;
     *) echo "Unknown option: $1"; usage ;;
   esac
@@ -255,14 +259,46 @@ if [[ "$MODE" == "deploy-mcp" ]]; then
   sed -e "s|__IMAGE__|$MCP_IMAGE|" -e "s|__VPC_CIDR__|$VPC_CIDR|" "$SCRIPT_DIR/mcp/k8s.yaml" | kubectl apply -f -
   kubectl rollout status deployment/dgbank-mcp -n "$MCP_NS" --timeout=180s
 
-  echo "Waiting for the internal load balancer address (~2 minutes)..."
-  MCP_HOST=""
-  for _ in $(seq 1 40); do
-    MCP_HOST=$(kubectl get svc dgbank-mcp-internal -n "$MCP_NS" \
-      -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
-    [[ -n "$MCP_HOST" ]] && break
-    sleep 6
-  done
+  # Optional public HTTPS endpoint. In the preview, the console's MCP tool discovery runs
+  # from Vision One rather than from this gateway, so it can't reach in-cluster or internal
+  # addresses. TLS terminates at the NLB with the ACM certificate; the bearer token is still
+  # required. Pinned to the ECS stack's public subnets so it never lands in the firewall subnets.
+  if [[ -n "$MCP_PUBLIC_CERT" ]]; then
+    PUB_SUBNETS="$(stack_resource PublicSubnetA),$(stack_resource PublicSubnetB)"
+    kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: dgbank-mcp-public
+  namespace: $MCP_NS
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-subnets: "$PUB_SUBNETS"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "$MCP_PUBLIC_CERT"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+spec:
+  type: LoadBalancer
+  selector: { app: dgbank-mcp }
+  ports:
+    - { name: https, port: 443, targetPort: http }
+EOF
+  fi
+
+  lb_host() {
+    local host=""
+    for _ in $(seq 1 40); do
+      host=$(kubectl get svc "$1" -n "$MCP_NS" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+      [[ -n "$host" ]] && break
+      sleep 6
+    done
+    echo "$host"
+  }
+  echo "Waiting for load balancer addresses (~2 minutes)..."
+  MCP_HOST=$(lb_host dgbank-mcp-internal)
+  MCP_PUBLIC_HOST=""
+  [[ -n "$MCP_PUBLIC_CERT" ]] && MCP_PUBLIC_HOST=$(lb_host dgbank-mcp-public)
 
   echo ""
   echo "================================================="
@@ -272,14 +308,21 @@ if [[ "$MODE" == "deploy-mcp" ]]; then
   echo "1. Vision One console → AI Gateway → Resources → MCP → Add MCP upstream:"
   echo "     Name:       dgbank-mcp"
   echo "     Transport:  HTTP"
-  echo "     URL:        http://dgbank-mcp.$MCP_NS.svc.cluster.local/mcp"
-  echo "     Auth:       Secret token"
-  echo "     Token:      $MCP_TOKEN"
+  if [[ -n "$MCP_PUBLIC_CERT" ]]; then
+    echo "     URL:        https://<your DNS name>/mcp"
+    echo "                 (CNAME your DNS name, covered by the certificate, to ${MCP_PUBLIC_HOST:-<pending NLB>})"
+  else
+    echo "     URL:        http://dgbank-mcp.$MCP_NS.svc.cluster.local/mcp"
+    echo "                 (console discovery can't reach this address; add the six tools by hand,"
+    echo "                  or rerun with --mcp-public-cert <ACM ARN> for a public HTTPS endpoint)"
+  fi
+  echo "     Auth:       None, plus header  Authorization = Bearer $MCP_TOKEN"
+  echo "                 (click Add next to the header before Save changes)"
   echo "   Then run tool discovery and check Resources → Discovered Tools (6 tools)."
   echo ""
   echo "2. Point the DG Bank app at the tools (direct route, Test 3):"
   echo "     ./deploy-ecs.sh --github-org <org> --skip-oidc --mcp-url http://${MCP_HOST:-<pending NLB>}/mcp"
-  echo "   The NLB needs 2-3 minutes before its targets are healthy."
+  echo "   The NLBs need 2-3 minutes before their targets are healthy."
   echo ""
   exit 0
 fi
