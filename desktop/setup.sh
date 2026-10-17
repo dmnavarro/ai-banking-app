@@ -145,7 +145,8 @@ Terminal=false
 EOF
   chmod 755 "$DESK/$1.desktop"; chown "$DEMO_USER:$DEMO_USER" "$DESK/$1.desktop"
 }
-CHROME="google-chrome --no-first-run --no-default-browser-check"
+# --password-store=basic: no "choose a password for the keyring" prompt on the shared desktop
+CHROME="google-chrome --no-first-run --no-default-browser-check --password-store=basic"
 shortcut hermes      "Hermes Agent"     "xfce4-terminal --title=Hermes --geometry=120x36 -x hermes" utilities-terminal
 shortcut open-webui  "DG Bank Engineering Chat" "$CHROME http://localhost:3000" google-chrome
 shortcut vision-one  "Vision One Events" "$CHROME ${V1_EVENTS:-https://portal.sg.xdr.trendmicro.com/}" google-chrome
