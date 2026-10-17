@@ -1963,8 +1963,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .desk-unlock .sc-input { max-width: 260px; }
 .desk-error { margin-top: .5rem; color: var(--bad-fg); font-size: .85rem; }
 a.btn-primary { text-decoration: none; display: inline-flex; align-items: center; }
-/* File Security: both source cards the same height; the link bar sits at the bottom, level with the drop zone */
+/* File Security: both source cards the same height; the link bar sits in the middle of the space below the text */
 .fs-wrap .two-col { align-items: stretch; }
 .fs-wrap .two-col > .panel-card { display: flex; flex-direction: column; }
 .fs-wrap .two-col > .panel-card .pb-dropzone { flex: 1; display: flex; flex-direction: column; justify-content: center; }
-.fs-wrap .two-col > .panel-card .pb-url-panel { margin-top: auto; }
+.fs-wrap .two-col > .panel-card .pb-url-panel { margin: auto 0; }
