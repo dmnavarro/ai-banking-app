@@ -63,12 +63,26 @@ Parameters:
     Default: ""
     Description: Model ID for DirectLlmBaseUrl, e.g. openai/gpt-oss-120b
 
+  McpDirectUrl:
+    Type: String
+    Default: ""
+    Description: >
+      DG Bank MCP server URL for the no-gateway tools route (printed by deploy-gateway.sh --deploy-mcp),
+      e.g. http://<internal-nlb>/mcp. When set, the SSM parameter /dgbank/mcp-token must exist.
+
+  GatewayMcpUrl:
+    Type: String
+    Default: ""
+    Description: AI Gateway MCP Connect URL for the dgbank-mcp upstream (from the console), used for tools in Gateway mode
+
 
 Conditions:
   ShouldCreateOIDC: !Equals [!Ref CreateOIDCProvider, "true"]
   HasCertificate: !Not [!Equals [!Ref CertificateArn, ""]]
   HasGateway: !Not [!Equals [!Ref GatewayBaseUrl, ""]]
   HasDirectLlm: !Not [!Equals [!Ref DirectLlmBaseUrl, ""]]
+  HasMcpDirect: !Not [!Equals [!Ref McpDirectUrl, ""]]
+  HasGatewayMcp: !Not [!Equals [!Ref GatewayMcpUrl, ""]]
 
 Resources:
 
@@ -568,6 +582,16 @@ Resources:
               - Name: DIRECT_LLM_MODEL
                 Value: !Ref DirectLlmModel
               - !Ref AWS::NoValue
+            - !If
+              - HasMcpDirect
+              - Name: MCP_DIRECT_URL
+                Value: !Ref McpDirectUrl
+              - !Ref AWS::NoValue
+            - !If
+              - HasGatewayMcp
+              - Name: GATEWAY_MCP_URL
+                Value: !Ref GatewayMcpUrl
+              - !Ref AWS::NoValue
           Secrets:
             - Name: TMAS_API_KEY
               ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/tmas-api-key"
@@ -587,6 +611,12 @@ Resources:
               - HasDirectLlm
               - Name: DIRECT_LLM_API_KEY
                 ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/direct-llm-key"
+              - !Ref AWS::NoValue
+            # Bearer token for calling the DG Bank MCP server directly (written by deploy-gateway.sh --deploy-mcp)
+            - !If
+              - HasMcpDirect
+              - Name: MCP_TOKEN
+                ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/mcp-token"
               - !Ref AWS::NoValue
           LogConfiguration:
             LogDriver: awslogs

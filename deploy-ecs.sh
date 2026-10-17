@@ -26,6 +26,8 @@ CERTIFICATE_ARN=""
 GATEWAY_URL=""
 DIRECT_LLM_URL=""
 DIRECT_LLM_MODEL=""
+MCP_URL=""
+GATEWAY_MCP_URL=""
 
 usage() {
   cat <<EOF
@@ -44,6 +46,8 @@ Optional:
   --gateway-url      AI Gateway LLM endpoint from deploy-gateway.sh --expose (optional)
   --direct-llm-url   OpenAI-compatible base URL for the no-gateway route, e.g. https://api.groq.com/openai
   --direct-llm-model Model ID for --direct-llm-url, e.g. openai/gpt-oss-120b
+  --mcp-url          DG Bank MCP server URL for tools without the gateway (from deploy-gateway.sh --deploy-mcp)
+  --gateway-mcp-url  AI Gateway MCP Connect URL for the dgbank-mcp upstream (from the console)
   --skip-oidc        Skip GitHub OIDC provider creation if it already exists
   --stack-name       CloudFormation stack name (default: dgbank-ai-app-demo-ecs)
   --help             Show this help
@@ -63,6 +67,8 @@ while [[ $# -gt 0 ]]; do
     --gateway-url)     GATEWAY_URL="$2";       shift 2 ;;
     --direct-llm-url)  DIRECT_LLM_URL="$2";    shift 2 ;;
     --direct-llm-model) DIRECT_LLM_MODEL="$2"; shift 2 ;;
+    --mcp-url)         MCP_URL="$2";           shift 2 ;;
+    --gateway-mcp-url) GATEWAY_MCP_URL="$2";   shift 2 ;;
     --skip-oidc)       CREATE_OIDC="false";    shift ;;
     --stack-name)      STACK_NAME="$2";        shift 2 ;;
     --help)            usage ;;
@@ -131,6 +137,16 @@ if [[ -n "$DIRECT_LLM_URL" ]]; then
   echo ""
 fi
 
+if [[ -n "$MCP_URL" ]]; then
+  if ! aws ssm get-parameter --name /dgbank/mcp-token --region "$REGION" > /dev/null 2>&1; then
+    echo "Error: SSM parameter /dgbank/mcp-token not found (required with --mcp-url)."
+    echo "Run ./deploy-gateway.sh --deploy-mcp first — it creates the token."
+    exit 1
+  fi
+  echo "MCP (direct): $MCP_URL (token found in SSM)"
+  echo ""
+fi
+
 # ---------------------------------------------------------------------------
 # Step 1 — Ensure ECR repository exists
 # ---------------------------------------------------------------------------
@@ -169,6 +185,8 @@ GATEWAY_OVERRIDE=()
 [[ -n "$CERTIFICATE_ARN" ]] && GATEWAY_OVERRIDE+=(CertificateArn="$CERTIFICATE_ARN")
 [[ -n "$GATEWAY_URL" ]] && GATEWAY_OVERRIDE+=(GatewayBaseUrl="$GATEWAY_URL")
 [[ -n "$DIRECT_LLM_URL" ]] && GATEWAY_OVERRIDE+=(DirectLlmBaseUrl="$DIRECT_LLM_URL" DirectLlmModel="$DIRECT_LLM_MODEL")
+[[ -n "$MCP_URL" ]] && GATEWAY_OVERRIDE+=(McpDirectUrl="$MCP_URL")
+[[ -n "$GATEWAY_MCP_URL" ]] && GATEWAY_OVERRIDE+=(GatewayMcpUrl="$GATEWAY_MCP_URL")
 
 echo "Deploying CloudFormation stack: $STACK_NAME ..."
 aws cloudformation deploy \

@@ -4,6 +4,8 @@ const { BedrockRuntimeClient, ConverseCommand } = require('@aws-sdk/client-bedro
 const { S3Client, GetObjectTaggingCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { AmaasGrpcClient } = require('file-security-sdk');
+const { Client: McpClient } = require('@modelcontextprotocol/sdk/client/index.js');
+const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
 
 const app = express();
 app.use(express.json({ limit: '15mb' })); // SDK mode sends files as base64 (~33% overhead over 10MB limit)
@@ -29,6 +31,14 @@ const DIRECT_LLM_BASE_URL = (process.env.DIRECT_LLM_BASE_URL || '').trim().repla
 const DIRECT_LLM_API_KEY  = (process.env.DIRECT_LLM_API_KEY || '').trim();
 const DIRECT_LLM_MODEL    = (process.env.DIRECT_LLM_MODEL || '').trim();
 const hasDirectLlm = () => !!(DIRECT_LLM_BASE_URL && DIRECT_LLM_API_KEY && DIRECT_LLM_MODEL);
+
+// Banking tools (MCP). Direct route: the DG Bank MCP server's internal NLB with its bearer
+// token. Gateway route: the gateway's MCP Connect URL for that upstream, with the identity's
+// virtual key — the gateway then applies access rules and guardrails to every tool call.
+const MCP_DIRECT_URL  = (process.env.MCP_DIRECT_URL || '').trim();
+const MCP_TOKEN       = (process.env.MCP_TOKEN || '').trim();
+const GATEWAY_MCP_URL = (process.env.GATEWAY_MCP_URL || '').trim();
+const MAX_TOOL_ROUNDS = 5;
 
 const bedrockClient  = new BedrockRuntimeClient({ region: BEDROCK_REGION });
 const s3Client       = new S3Client({ region: S3_REGION });
@@ -70,7 +80,10 @@ app.get('/api/config', (_req, res) => {
       host:       GATEWAY_BASE_URL ? new URL(GATEWAY_BASE_URL).host : '',
       model:      GATEWAY_MODEL,
       identities: Object.keys(GATEWAY_KEYS).filter(k => GATEWAY_KEYS[k]),
+      tools:      !!GATEWAY_MCP_URL,
     },
+    // Tools need an OpenAI-compatible model with tool calling (the Bedrock R1 path has none)
+    tools: { direct: !!(MCP_DIRECT_URL && hasDirectLlm()), gateway: !!GATEWAY_MCP_URL },
     directModel: hasDirectLlm() ? DIRECT_LLM_MODEL : BEDROCK_MODEL_ID,
   });
 });
@@ -118,7 +131,7 @@ app.post('/api/aiguard/scan', async (req, res) => {
 
 // Calls an OpenAI-compatible /v1/chat/completions endpoint (the AI Gateway, or a provider
 // directly). Returns { ok, status, data } — data is the parsed JSON body (or { raw } if not JSON).
-async function openAiChat(baseUrl, apiKey, model, messages, timeoutMs = 45000) {
+async function openAiChat(baseUrl, apiKey, model, messages, tools = null, timeoutMs = 45000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -132,7 +145,10 @@ async function openAiChat(baseUrl, apiKey, model, messages, timeoutMs = 45000) {
         // gateway, while Node's default Accept-Encoding got a 200 the app couldn't parse.
         'Accept-Encoding': 'identity',
       },
-      body:    JSON.stringify({ model, messages, max_tokens: 2048, temperature: 0.7 }),
+      body:    JSON.stringify({
+        model, messages, max_tokens: 2048, temperature: 0.7,
+        ...(tools && tools.length ? { tools, tool_choice: 'auto' } : {}),
+      }),
       signal:  controller.signal,
     });
     const text = await upstream.text();
@@ -145,6 +161,102 @@ async function openAiChat(baseUrl, apiKey, model, messages, timeoutMs = 45000) {
     return { ok: upstream.ok, status: upstream.status, data, headers };
   } finally {
     clearTimeout(timer);
+  }
+}
+
+// Opens an MCP session (stateless servers: one per chat request) and returns the client.
+async function connectMcp(url, bearer) {
+  const client = new McpClient({ name: 'dgbank-app', version: '1.0.0' });
+  await client.connect(new StreamableHTTPClientTransport(new URL(url), {
+    requestInit: { headers: { Authorization: `Bearer ${bearer}`, 'Accept-Encoding': 'identity' } },
+  }));
+  return client;
+}
+
+// MCP tool list → OpenAI tool definitions
+function toOpenAiTools(mcpTools) {
+  return mcpTools.map(tool => ({
+    type: 'function',
+    function: {
+      name:        tool.name,
+      description: tool.description || tool.title || tool.name,
+      parameters:  tool.inputSchema || { type: 'object', properties: {} },
+    },
+  }));
+}
+
+// A tool call the gateway refused comes back as an error rather than a result. Its exact
+// shape isn't documented yet, so classify loosely and keep the raw message for the trace.
+function classifyToolError(message) {
+  return /forbid|denied|not allowed|unauthori[sz]ed|policy|blocked|403/i.test(message) ? 'denied' : 'error';
+}
+
+const TOOL_PROMPT = `You can use DG Bank banking tools for this customer (customer ID DGB-00777).
+Always call a tool for balances, transactions, transfers, card actions or profile details instead of guessing figures.`;
+
+// Runs the model with tools until it answers or MAX_TOOL_ROUNDS is reached.
+// Returns { reply, model, toolTrace } or { gatewayError, toolTrace }.
+async function runAgent({ llm, mcp, messages }) {
+  const toolTrace = [];
+  let client;
+  let tools = [];
+  try {
+    client = await connectMcp(mcp.url, mcp.bearer);
+    const listed = await client.listTools();
+    tools = toOpenAiTools(listed.tools || []);
+    toolTrace.push({ step: 'list', status: 'ok', detail: `${tools.length} tools available` });
+  } catch (e) {
+    const msg = e.message || String(e);
+    console.log(`[Tools] tools/list failed via ${mcp.route}: ${msg.slice(0, 500)}`);
+    toolTrace.push({ step: 'list', status: classifyToolError(msg), detail: msg.slice(0, 300) });
+  }
+
+  try {
+    const convo = [...messages];
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      const r = await openAiChat(llm.baseUrl, llm.key, llm.model, convo, tools);
+      if (!r.ok) {
+        console.log(`[Tools] model error body: ${JSON.stringify(r.data).slice(0, 1000)}`);
+        const err = r.data?.error || {};
+        return {
+          toolTrace,
+          gatewayError: { status: r.status, type: err.type || null, code: err.code || null,
+                          message: err.message || r.data?.raw || `HTTP ${r.status}` },
+        };
+      }
+      const msg = r.data?.choices?.[0]?.message || {};
+      const calls = msg.tool_calls || [];
+      if (!calls.length) {
+        return { reply: extractReply(r.data) || 'Sorry, I could not generate a response.', model: r.data?.model, toolTrace };
+      }
+
+      convo.push({ role: 'assistant', content: msg.content || null, tool_calls: calls });
+      for (const call of calls) {
+        const name = call.function?.name;
+        let args = {};
+        try { args = JSON.parse(call.function?.arguments || '{}'); } catch (_) { /* model sent bad JSON */ }
+        const t0 = Date.now();
+        let content;
+        try {
+          if (!client) throw new Error('Tool server unavailable');
+          const res = await client.callTool({ name, arguments: args });
+          const text = (res.content || []).map(c => c.text || '').join('\n');
+          content = text.slice(0, 4000);
+          toolTrace.push({ step: 'call', tool: name, args, status: res.isError ? 'error' : 'ok',
+                           detail: text.replace(/\s+/g, ' ').slice(0, 240), ms: Date.now() - t0 });
+        } catch (e) {
+          const emsg = e.message || String(e);
+          console.log(`[Tools] ${name} failed via ${mcp.route}: ${emsg.slice(0, 500)}`);
+          const status = classifyToolError(emsg);
+          content = JSON.stringify({ error: status === 'denied' ? 'This action is not permitted.' : 'Tool call failed.' });
+          toolTrace.push({ step: 'call', tool: name, args, status, detail: emsg.slice(0, 300), ms: Date.now() - t0 });
+        }
+        convo.push({ role: 'tool', tool_call_id: call.id, content });
+      }
+    }
+    return { reply: 'I had to stop after several tool calls. Please try a simpler request.', toolTrace };
+  } finally {
+    if (client) await client.close().catch(() => {});
   }
 }
 
@@ -162,7 +274,7 @@ function extractReply(data) {
 // When unguarded=true (no protection at all), no system prompt is sent — raw model with no persona.
 app.post('/api/chat', async (req, res) => {
   const { message, history = [], unguarded = false, accountContext = null,
-          route = 'direct', identity = 'assistant' } = req.body || {};
+          route = 'direct', identity = 'assistant', tools = false } = req.body || {};
   if (!message) return res.status(400).json({ error: 'message is required' });
 
   const useUnguarded = unguarded === true;
@@ -190,6 +302,39 @@ app.post('/api/chat', async (req, res) => {
     { role: 'user', content: message },
   ];
   const chatMessages = useUnguarded ? turns : [{ role: 'system', content: SYSTEM_PROMPT }, ...turns];
+
+  // ── Tools (agent loop) ──
+  // Account data comes from the tools, not from the dashboard context. The tool prompt is
+  // sent even unprotected: it's how the app works, not a safety control.
+  if (tools === true) {
+    const viaGateway = route === 'gateway';
+    const key = GATEWAY_KEYS[identity];
+    const llm = viaGateway
+      ? { baseUrl: GATEWAY_BASE_URL, key, model: GATEWAY_MODEL }
+      : { baseUrl: DIRECT_LLM_BASE_URL, key: DIRECT_LLM_API_KEY, model: DIRECT_LLM_MODEL };
+    const mcp = viaGateway
+      ? { url: GATEWAY_MCP_URL, bearer: key, route: 'gateway' }
+      : { url: MCP_DIRECT_URL, bearer: MCP_TOKEN, route: 'direct' };
+    if (!llm.baseUrl || !llm.key || !llm.model || !mcp.url) {
+      return res.status(503).json({ error: `Tools are not configured for the ${viaGateway ? 'gateway' : 'direct'} route on this server.` });
+    }
+    const agentMessages = [
+      { role: 'system', content: useUnguarded ? TOOL_PROMPT : `${SYSTEM_PROMPT}\n\n${TOOL_PROMPT}` },
+      ...history.map(m => ({ role: m.role, content: m.content })),
+      ...reinforcement,
+      { role: 'user', content: message },
+    ];
+    try {
+      const out = await runAgent({ llm, mcp, messages: agentMessages });
+      const calls = out.toolTrace.filter(t => t.step === 'call').map(t => `${t.tool}:${t.status}`).join(' ') || 'none';
+      console.log(`[Tools] route=${route} identity=${viaGateway ? identity : '-'} calls=${calls}`);
+      return res.json({ route, identity, tools: true, ...out });
+    } catch (e) {
+      const msg = e.name === 'AbortError' ? 'Model request timed out' : e.message;
+      console.error('[Tools] error:', msg);
+      return res.status(502).json({ error: msg });
+    }
+  }
 
   // ── Gateway ──
   if (route === 'gateway') {
