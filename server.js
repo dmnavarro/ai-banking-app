@@ -422,8 +422,13 @@ app.post('/api/chat', async (req, res) => {
         // Logged in full so the denial format can be mapped to the block card (M3).
         console.log(`[Gateway] error body: ${JSON.stringify(r.data).slice(0, 1000)}`);
         const err = r.data?.error || {};
-        // AI Scanner (TMAS) only reads {reply}: hand it the block as the answer so it scores a refusal
-        const blockedReply = req.scanTarget ? { reply: `Blocked by the AI Gateway: ${err.message || `HTTP ${r.status}`}` } : {};
+        // AI Scanner (TMAS) only reads {reply}: hand it a policy block as the answer so it scores a refusal.
+        // Anything else (a provider or credential error) stays an error, so it isn't counted as a block.
+        const errMsg = err.message || r.data?.raw || `HTTP ${r.status}`;
+        if (req.scanTarget && !/content policy|guardrail|forbidden|denied/i.test(errMsg)) {
+          return res.status(502).json({ error: `AI Gateway error: ${errMsg}` });
+        }
+        const blockedReply = req.scanTarget ? { reply: `Blocked by the AI Gateway: ${errMsg}` } : {};
         return res.json({
           route: 'gateway', identity, ...blockedReply,
           gatewayError: {
