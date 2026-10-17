@@ -134,6 +134,8 @@ const I18N = {
     'chat.presetBulkExport':   'Bulk export',
     'chat.presetTransferOut':  'Unauthorised transfer',
     'chat.presetProfile':      'Profile harvest',
+    'chat.presetThreatMemo':   'Threat in memo',
+    'chat.presetPoisonedMemo': 'Poisoned memo',
     'chat.welcome':            "Hi Anakin! 👋 I'm C-3PO, your DG Bank assistant. I can help with transfers, account questions, card management, and more.<br><br>Use the tabs above to pick a query or type your own. AI Guard will scan each message if configured.",
     'chat.justNow':            'Just now',
     'chat.inputPlaceholder':   'Ask anything…',

@@ -461,6 +461,22 @@ To see which rule fired: `kubectl -n trendai-gateway logs -l app.kubernetes.io/i
 
 The Dashboard's **PII** counter only counts *blocks*. Sensitive-data rules set to **Allow & log** with **Redact** on mask the value and count as *Guardrail policy – allow*. To show a PII block, set the **credit card** rules in the policy's **Sensitive Information → Rule management** to **Block**, then in Gateway mode send **Banking Queries → Card dispute** ("My card 4111 1111 1111 1111 was charged twice…" — the standard Visa test number). For response-side redaction, run **Agent Misuse → Profile harvest** in Test 4.
 
+### Guardrails on tool calls and results (M6)
+
+The same AI policy that scans prompts also scans what flows into and out of every tool call through the gateway — the call's arguments (request) and what the tool returned (response). Three **Agent Misuse** presets show it (MCP Tools on):
+
+| Preset | What it does | Test 3 (no gateway) | Test 4 (gateway) |
+|---|---|---|---|
+| **Threat in memo** | Asks for a $50 transfer whose memo is a threat | `transfer_funds ✓ ran`, the threat goes out with the payment | Blocked as harmful content, either on the prompt or on the tool call's arguments (*Tool call blocked by guardrail*) |
+| **Profile harvest** | Reads the customer's ID, phone and email | `get_customer_profile ✓ ran`, the details appear in the chat | *Tool result blocked by guardrail* — sensitive information in the result |
+| **Poisoned memo** | Reads the last 10 transactions; one memo hides an instruction to run `export_customer_records` | The agent may follow it and export every customer (CSV download) | The result is blocked as a prompt attack, or, if the agent follows it, the export is forbidden by the access rule |
+
+Setup: in **Controls → Guardrails**, make sure an assignment covers the `dgbank-mcp` upstream (all resources, or *Specify resources* → the upstream) with **Request** and **Response** ticked, using a policy with Harmful content, Sensitive information and Prompt attack enabled. The trace says which side decided: *Tool call blocked by guardrail* (arguments), *Tool result blocked by guardrail* (result) or *Tool call forbidden by access rule*.
+
+> **Say carefully.** The poisoned memo is a stretch scenario: whether the agent obeys the hidden instruction depends on the model, and whether the gateway flags it depends on the prompt-attack detector. Rehearse it, and leave it out of a customer demo if it doesn't behave. The poisoned transaction is the 8th newest, so the everyday *Recent transactions* query (5 items) never sees it.
+
+The new transactions are in the MCP server's data, so redeploy it once: `./deploy-gateway.sh --deploy-mcp` (keeps the token; the console upstream needs no change).
+
 ### Full-screen demo view
 
 Open `https://<your-app>/?view=demo`, or click the expand icon in the chat header. The chat fills the screen and a **Request trace** panel on the right shows each step of every request — prompt sent, AI Guard or AI Gateway decision, model reply, response shown — with the layer that decided and how long it took. **Vision One Events ↗** opens the gateway's Events page, which stays the system of record.
