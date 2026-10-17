@@ -1,5 +1,6 @@
 const express = require('express');
 const path    = require('path');
+const fs      = require('fs');
 const { BedrockRuntimeClient, ConverseCommand } = require('@aws-sdk/client-bedrock-runtime');
 const { S3Client, GetObjectTaggingCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
@@ -968,8 +969,12 @@ app.get('/api/gateway/health', async (_req, res) => {
 });
 
 // Serve the app at root
+// Asset URLs carry the start-up time, so a new page never pairs with a cached older styles.css or app.js
+const ASSET_VERSION = Date.now().toString(36);
+const INDEX_HTML = fs.readFileSync(path.join(__dirname, 'dgbank.html'), 'utf8')
+  .replace(/(href|src)="(styles\.css|i18n\.js|app\.js)"/g, `$1="$2?v=${ASSET_VERSION}"`);
 app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'dgbank.html'));
+  res.set('Cache-Control', 'no-cache').type('html').send(INDEX_HTML);
 });
 
 const PORT = process.env.PORT || 3000;
