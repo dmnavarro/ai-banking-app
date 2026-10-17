@@ -111,6 +111,10 @@ Optional, separate from the main stack. Runs in the ECS stack's VPC and public s
 
 The gateway itself is installed by hand with the Helm command the Vision One console generates.
 
+### `deploy-desktop.sh` — Laptop agents demo desktop (CloudFormation: `cloudformation/desktop.yml`)
+
+Optional (M8). One EC2 instance in the ECS stack's public subnet: Ubuntu 24.04, t3.large, 40 GB encrypted gp3, IMDSv2 only, a security group with **no inbound rules**, and an instance role limited to SSM plus reading `/dgbank/gateway-key-laptop`. The software (`desktop/setup.sh`: XFCE, TigerVNC and noVNC on localhost, Chrome, Open WebUI in Docker, Hermes Agent) is installed with SSM Run Command.
+
 ---
 
 ## Prerequisites
@@ -124,6 +128,7 @@ The gateway itself is installed by hand with the Helm command the Vision One con
 | Amazon Bedrock model access | In the AWS console → Bedrock → Model access, switch region to **us-east-1** and enable **DeepSeek-R1**. DeepSeek-R1 isn't available in-region in us-east-1 — the app invokes it via the `us.deepseek.r1-v1:0` cross-region inference profile, which routes to us-east-1/us-east-2/us-west-2. The chatbot runs in us-east-1 regardless of where ECS is deployed. |
 | (Optional) ACM certificate | For HTTPS — request a wildcard cert in ACM before running the deploy script |
 | (AI Gateway only) kubectl, Helm, jq | Needed by `deploy-gateway.sh` and the console's Helm command |
+| (Laptop agents only) Session Manager plugin | For `deploy-desktop.sh --connect` ([install](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html)) |
 
 ---
 
@@ -478,6 +483,42 @@ Setup: in **Controls → Guardrails**, make sure an assignment covers the `dgban
 
 The new transactions are in the MCP server's data, so redeploy it once: `./deploy-gateway.sh --deploy-mcp` (keeps the token; the console upstream needs no change).
 
+### Laptop agents demo desktop (M8)
+
+The **Laptop Agents** page shows the fourth use case: an engineer's own AI agent going through the same gateway. `deploy-desktop.sh` builds an Ubuntu desktop in the ECS stack's VPC (t3.large) that you open in a browser. It has no inbound ports: you reach it through an SSM port-forward. On it:
+
+- **Hermes Agent** (terminal), with the gateway as its model provider (`dgbank-chat`) and the `dgbank-mcp` tools through the gateway's MCP Connect URL.
+- **DG Bank Engineering Chat**: Open WebUI, a ChatGPT-style app whose only model provider is the gateway.
+- Chrome with a **Vision One Events** shortcut.
+
+All three use one identity, `engineer-laptop`.
+
+**1. In the console**, add the identity and its rules:
+- **Identities**: team *Engineering*, identity `engineer-laptop`, and a virtual key for it.
+- **Controls → Access Control**: allow the read-only tools (`get_balance`, `list_transactions`, `get_customer_profile`), forbid `transfer_funds` and `export_customer_records` for `engineer-laptop` (the existing forbid-export-for-all rule already covers the export).
+- The guardrail assignment `dgbank-ai-deny-enabled` covers all identities, so nothing to add there.
+
+**2. Store the key and build the desktop** (needs the ECS stack deployed with `--gateway-url` and `--gateway-mcp-url`; the script reads both from it):
+
+```bash
+aws ssm put-parameter --region ap-southeast-1 --type SecureString \
+  --name /dgbank/gateway-key-laptop --value '<engineer-laptop virtual key>'
+
+./deploy-desktop.sh            # 10–15 minutes the first time; ends with a test call as engineer-laptop
+```
+
+**3. Open it** (needs the [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) for the AWS CLI):
+
+```bash
+./deploy-desktop.sh --connect  # leave it running
+```
+
+Then browse to <http://localhost:6080/vnc.html?autoconnect=1&resize=scale>, or click **Open demo desktop** on the Laptop Agents page. The page lists the demo prompts.
+
+Between demos, `./deploy-desktop.sh --stop` (no compute cost while stopped) and `--start`. After rotating the key, update the SSM parameter and run `./deploy-desktop.sh --setup`. `--delete` removes the desktop.
+
+> **To verify on the first run.** Hermes's config file format (`~/.hermes/config.yaml`: `model.provider: custom`, `base_url`, `api_key`, `default`; `mcp_servers.dgbank.url` + `headers`) was taken from its documentation, not tested here. If Hermes asks for a provider on first start, run `hermes model` on the desktop and choose the custom endpoint. If Open WebUI shows no models, add `dgbank-chat` under **Admin → Settings → Connections**.
+
 ### Gateway pods and memory
 
 Each gateway pod loads three scanner models at start-up and uses about 1.5 GiB, but the chart requests only 1 GiB. When the autoscaler adds pods, the node runs out of memory: pods are OOMKilled or evicted, and a pod that survives can miss the 30-second load window for the sensitive-data scanner (`Module 'skyeyes_scanner' load timed out`). That pod then skips every sensitive-data check and allows the traffic, with only a WARN in its log. Preflight's guardrails row shows it as *allowed*.
@@ -751,6 +792,21 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | `--api-cidr` | `0.0.0.0/0` | CIDR allowed to reach the Kubernetes API |
 | `--gateway-service` | *(auto)* | `namespace/name` of the gateway Service, if `--expose` can't find it |
 | `--mcp-public-cert` | *(none)* | With `--deploy-mcp`: ACM certificate ARN for a public HTTPS endpoint, so console discovery can reach the MCP server |
+
+---
+
+### `deploy-desktop.sh`
+
+| Mode / option | Default | Description |
+|---|---|---|
+| *(none)* | | Create or update the demo desktop and install its software |
+| `--connect` | | SSM port-forward to the desktop's noVNC (`localhost:6080`) |
+| `--setup` | | Re-run the software setup (after a key change) |
+| `--start` / `--stop` | | Start or stop the instance |
+| `--delete` | | Delete the desktop stack |
+| `--instance-type` | `t3.large` | `t3.large`, `t3.xlarge` or `m7i.large` |
+| `--gateway-url` / `--gateway-mcp-url` | from the ECS stack | Override the gateway endpoints |
+| `--v1-region` | `sg` | Vision One portal region for the Events shortcut |
 
 ---
 

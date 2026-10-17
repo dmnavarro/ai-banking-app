@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  DG Bank — demo desktop for the Laptop Agents use case (M8).
+  An Ubuntu desktop in the ECS stack's VPC, opened in a browser through noVNC over an
+  SSM port-forward. Nothing listens on a public port. Hermes and Open WebUI on it call the
+  AI Gateway's internal load balancer with the engineer-laptop virtual key.
+  deploy-desktop.sh creates the stack and then installs the software with SSM Run Command.
+
+Parameters:
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC created by the ECS stack (deploy-desktop.sh looks this up)
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: One of the ECS stack's public subnets (outbound internet for installs)
+
+  InstanceType:
+    Type: String
+    Default: t3.large
+    AllowedValues: [t3.large, t3.xlarge, m7i.large]
+    Description: t3.large (2 vCPU / 8 GB) runs the desktop, a browser and Open WebUI
+
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+    Description: Ubuntu 24.04 LTS (includes the SSM agent)
+
+Resources:
+
+  DesktopRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: read-laptop-key
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/gateway-key-laptop"
+
+  DesktopProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref DesktopRole]
+
+  # No inbound rules: the desktop is reached only through SSM Session Manager.
+  DesktopSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: DG Bank demo desktop (outbound only)
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+
+  Desktop:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref DesktopProfile
+      MetadataOptions:
+        HttpTokens: required
+      NetworkInterfaces:
+        - DeviceIndex: "0"
+          SubnetId: !Ref SubnetId
+          AssociatePublicIpAddress: true      # outbound only; the security group has no inbound rules
+          GroupSet: [!Ref DesktopSecurityGroup]
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 40
+            VolumeType: gp3
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: dgbank-demo-desktop
+
+Outputs:
+  InstanceId:
+    Value: !Ref Desktop
