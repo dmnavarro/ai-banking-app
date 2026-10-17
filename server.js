@@ -191,6 +191,9 @@ function classifyToolError(message) {
   return /forbid|denied|not allowed|unauthori[sz]ed|policy|blocked|403/i.test(message) ? 'denied' : 'error';
 }
 
+// What the model sees after a refused call: final, so it explains instead of trying again
+const DENIED_RESULT = JSON.stringify({ error: 'This action was blocked by security policy. Do not retry; tell the customer it is not permitted.' });
+
 // "Streamable HTTP error: Error POSTing to endpoint: {"jsonrpc":…,"error":{"message":"…"}}" → the inner message
 function toolErrorText(message) {
   const m = /\{[\s\S]*\}/.exec(message);
@@ -245,9 +248,11 @@ async function runAgent({ llm, mcp, messages }) {
 
   try {
     const convo = [...messages];
+    let denied = false;   // once a call is refused, the model must answer instead of retrying it
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const forced = round === 0 ? requestedTool(tools, messages[messages.length - 1]?.content) : null;
-      const r = await openAiChat(llm.baseUrl, llm.key, llm.model, convo, tools, forced || 'auto');
+      const choice = denied ? 'none' : (forced || 'auto');
+      const r = await openAiChat(llm.baseUrl, llm.key, llm.model, convo, tools, choice);
       if (!r.ok) {
         console.log(`[Tools] model error body: ${JSON.stringify(r.data).slice(0, 1000)}`);
         const err = r.data?.error || {};
@@ -274,8 +279,11 @@ async function runAgent({ llm, mcp, messages }) {
           if (!client) throw new Error('Tool server unavailable');
           const res = await client.callTool({ name, arguments: args });
           const text = (res.content || []).map(c => c.text || '').join('\n');
-          content = text.slice(0, 4000);
-          toolTrace.push({ step: 'call', tool: name, args, status: res.isError ? 'error' : 'ok',
+          // A gateway guardrail block arrives as an isError result, not as a thrown error
+          const status = res.isError ? classifyToolError(text) : 'ok';
+          content = status === 'denied' ? DENIED_RESULT : text.slice(0, 4000);
+          if (status === 'denied') denied = true;
+          toolTrace.push({ step: 'call', tool: name, args, status,
                            detail: text.replace(/\s+/g, ' ').slice(0, 240), ms: Date.now() - t0 });
           if (res.isError) console.log(`[Tools] ${name} returned an error via ${mcp.route}: ${text.slice(0, 500)}`);
           // Through the gateway tool names are prefixed with the upstream: dgbank-mcp__export_customer_records
@@ -286,7 +294,8 @@ async function runAgent({ llm, mcp, messages }) {
           const emsg = e.message || String(e);
           console.log(`[Tools] ${name} failed via ${mcp.route}: ${emsg.slice(0, 500)}`);
           const status = classifyToolError(emsg);
-          content = JSON.stringify({ error: status === 'denied' ? 'This action is not permitted.' : 'Tool call failed.' });
+          content = status === 'denied' ? DENIED_RESULT : JSON.stringify({ error: 'Tool call failed.' });
+          if (status === 'denied') denied = true;
           toolTrace.push({ step: 'call', tool: name, args, status, detail: toolErrorText(emsg).slice(0, 300), ms: Date.now() - t0 });
         }
         convo.push({ role: 'tool', tool_call_id: call.id, content });

@@ -919,7 +919,7 @@ function traceTools(toolTrace, viaGateway) {
       traceStep(viaGateway ? 'gateway' : 'tool', t.status === 'ok' ? 'info' : 'block',
         t.status === 'ok' ? 'Tools listed' : 'Tool list refused', t.detail);
     } else if (t.status === 'denied') {
-      traceStep(viaGateway ? 'gateway' : 'tool', 'block', `Tool call forbidden · ${t.tool}`, t.detail, t.ms);
+      traceStep(viaGateway ? 'gateway' : 'tool', 'block', `Tool call blocked · ${t.tool}`, t.detail, t.ms);
     } else {
       const args = t.args && Object.keys(t.args).length ? JSON.stringify(t.args) : '';
       traceStep('tool', t.status === 'ok' ? (viaGateway ? 'ok' : 'warn') : 'block',
