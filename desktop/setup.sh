@@ -101,8 +101,10 @@ docker run -d --name open-webui --restart always -p 127.0.0.1:3000:8080 \
 # ── Hermes Agent, pointed at the gateway (model and MCP tools) ───────────────
 if [[ ! -x "$DEMO_HOME/hermes-agent/.venv/bin/hermes" ]]; then
   log "Installing Hermes Agent..."
+  # Run Command starts in a directory the demo user can't write to
   sudo -u "$DEMO_USER" -H bash -lc '
     set -e
+    cd "$HOME"
     command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
     [ -d hermes-agent ] || git clone --depth 1 https://github.com/NousResearch/hermes-agent.git
