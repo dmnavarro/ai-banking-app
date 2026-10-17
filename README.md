@@ -478,6 +478,29 @@ Setup: in **Controls → Guardrails**, make sure an assignment covers the `dgban
 
 The new transactions are in the MCP server's data, so redeploy it once: `./deploy-gateway.sh --deploy-mcp` (keeps the token; the console upstream needs no change).
 
+### Gateway pods and memory
+
+Each gateway pod loads three scanner models at start-up and uses about 1.5 GiB, but the chart requests only 1 GiB. When the autoscaler adds pods, the node runs out of memory: pods are OOMKilled or evicted, and a pod that survives can miss the 30-second load window for the sensitive-data scanner (`Module 'skyeyes_scanner' load timed out`). That pod then skips every sensitive-data check and allows the traffic, with only a WARN in its log. Preflight's guardrails row shows it as *allowed*.
+
+Set an honest memory request once after installing (and again after any upgrade from the console), so pods that do not fit wait as Pending instead:
+
+```bash
+kubectl -n trendai-gateway set resources deploy/trendai-gateway-gateway -c gateway \
+  --requests=memory=2Gi --limits=memory=3Gi
+kubectl -n trendai-gateway rollout status deploy/trendai-gateway-gateway
+kubectl -n trendai-gateway delete pod --field-selector=status.phase=Failed
+```
+
+Check every pod, not just one (`logs deploy/...` reads a single pod):
+
+```bash
+for p in $(kubectl -n trendai-gateway get pods -o name | grep gateway-gateway); do
+  echo "$p"; kubectl -n trendai-gateway logs $p --tail=-1 | grep 'scanner module status' | grep -o '"skyeyes_scanner","loaded":[a-z]*'
+done
+```
+
+Every pod must print `"loaded":true`. If new pods go Pending under load, move the node to `t3.2xlarge` (`./deploy-gateway.sh --instance-type t3.2xlarge`).
+
 ### Full-screen demo view
 
 **Chatbot Assistant** in the sidebar opens this view (on a phone, the Assistant tab opens the chat full screen instead).
@@ -510,7 +533,7 @@ Removes the load balancer, the gateway release and its Redis volume, both contro
 
 ### Before every demo (5 minutes)
 
-1. **AI Gateway → Preflight → Run preflight.** Every row must be ✓. The checks call the gateway as each virtual key, send the test card `4111 1111 1111 1111` (it must be **denied** — if it comes back *allowed*, guardrails are not scanning; on `c7i` nodes the sensitive-data scanner fails, use `t3.xlarge`), and list the six MCP tools through the gateway and direct. The same result is at `GET /api/gateway/health`.
+1. **AI Gateway → Preflight → Run preflight.** Every row must be ✓. The checks call the gateway as each virtual key, send the test card `4111 1111 1111 1111` (it must be **denied** — if it comes back *allowed*, guardrails are not scanning: see [Gateway pods and memory](#gateway-pods-and-memory)), and list the six MCP tools through the gateway and direct. The same result is at `GET /api/gateway/health`.
 2. Open **Vision One → AI Gateway → Events** in a second tab, and the **AI Scanner** page in Vision One (the **Vision One ↗** link on the app's AI Scanner page opens it for the region in Settings).
 3. Open `https://<your-app>/?view=demo` and press **Test 1**.
 
@@ -722,7 +745,7 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | `--ecs-stack` | `dgbank-ai-app-demo-ecs` | Name of the ECS CF stack (to find the VPC and subnets) |
 | `--stack-name` | `dgbank-ai-gateway-eks` | CloudFormation stack name |
 | `--cluster-name` | `dgbank-ai-gateway` | EKS cluster name |
-| `--instance-type` | `t3.xlarge` | Node instance type. Avoid c7i: with chart 0.1.159 the gateway's sensitive-data scanner fails to start there and every guardrail scan is skipped (fail open). `t3.large` is cheaper but leaves no room for rolling restarts |
+| `--instance-type` | `t3.xlarge` | Node instance type. Avoid c7i: with chart 0.1.159 the gateway's sensitive-data scanner fails to start there and every guardrail scan is skipped (fail open). Set the pods' memory request after installing (see [Gateway pods and memory](#gateway-pods-and-memory)); `t3.2xlarge` gives the autoscaler more room. `t3.large` is cheaper but leaves no room for rolling restarts |
 | `--node-count` | `1` | Number of nodes |
 | `--k8s-version` | *(EKS default)* | Kubernetes version, e.g. `1.34` |
 | `--api-cidr` | `0.0.0.0/0` | CIDR allowed to reach the Kubernetes API |
