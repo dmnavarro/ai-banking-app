@@ -825,7 +825,6 @@ function downloadExport(records) {
 // Tool steps into the trace. Through the gateway, a refused call is the gateway's decision.
 function traceTools(toolTrace, viaGateway) {
   for (const t of toolTrace || []) {
-    if (t.step === 'call') recordToolCall(t, viaGateway);
     if (t.step === 'list') {
       traceStep(viaGateway ? 'gateway' : 'tool', t.status === 'ok' ? 'info' : 'block',
         t.status === 'ok' ? 'Tools listed' : 'Tool list refused', t.detail);
@@ -1349,36 +1348,13 @@ function syncAppChrome() {
   if (currentView === 'gateway') renderGatewayPage();
 }
 
-// ── AI Gateway page ──
-const toolCalls = [];   // this session's tool calls, newest first
-function recordToolCall(call, viaGateway) {
-  toolCalls.unshift({ tool: String(call.tool).replace(/^.*__/, ''), status: call.status, viaGateway });
-  if (toolCalls.length > 6) toolCalls.pop();
-  if (currentView === 'gateway') renderGatewayPage();
-}
-
+// ── AI Gateway page: the diagram is static; only the status tag is live ──
 function renderGatewayPage() {
   const on = isGatewayOn();
   const tag = document.getElementById('gwStateTag');
-  if (tag) {
-    tag.className = 'tag ' + (on ? 'ok' : serverGateway.configured ? '' : 'warn');
-    tag.textContent = on ? t('gw.on') : serverGateway.configured ? t('gw.off') : t('gw.notConfigured');
-  }
-  const route = document.getElementById('gwRouteLine');
-  if (route) route.textContent = [
-    on ? t('gw.routeGwOn') : t('gw.routeGwOff'),
-    isGuardOn() ? t('gw.routeGuardOn') : t('gw.routeGuardOff'),
-    isToolsOn() ? t('gw.routeToolsOn') : t('gw.routeToolsOff'),
-  ].join(', ');
-  const list = document.getElementById('gwLatestCalls');
-  if (!list) return;
-  const LABEL = { ok: ['ok', 'gw.allowed'], denied: ['bad', 'gw.denied'], error: ['warn', 'gw.failed'] };
-  list.innerHTML = toolCalls.length
-    ? toolCalls.map(c => {
-        const [cls, key] = LABEL[c.status] || LABEL.error;
-        return `<li><code>${escHtml(c.tool)}</code><span class="muted small">${c.viaGateway ? 'AI Gateway' : t('gw.direct')}</span><span class="tag ${cls}">${t(key)}</span></li>`;
-      }).join('')
-    : `<li class="empty">${t('gw.noCalls')}</li>`;
+  if (!tag) return;
+  tag.className = 'tag ' + (on ? 'ok' : serverGateway.configured ? '' : 'warn');
+  tag.textContent = on ? t('gw.on') : serverGateway.configured ? t('gw.off') : t('gw.notConfigured');
 }
 
 // ── Offers ──

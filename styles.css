@@ -1585,7 +1585,7 @@ body.demo-mode .tool-chip { font-size: .82rem; }
 }
 body { background: var(--page); }
 /* Line icons in the new layout (existing chat/scanner icons keep their own attributes) */
-.sb-nav svg, .sb-foot svg, .tabbar svg, .app-main svg, .fs-wrap svg { stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sb-nav svg, .sb-foot svg, .tabbar svg, .app-main svg:not(.gw-diagram), .fs-wrap svg { stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 [hidden] { display: none !important; }
 .m-only { display: none !important; }
 
@@ -1897,3 +1897,16 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .chat-toggle { animation: pulse-ring 2.5s ease-out infinite; }
 .chat-toggle:hover { animation: none; }
 @media (prefers-reduced-motion: reduce) { .pdot.on, .chat-toggle { animation: none; } }
+
+/* AI Gateway page: architecture diagram from the redesign (tabs are radio buttons, animation is SVG) */
+.gwr input{position:absolute;opacity:0;pointer-events:none}
+.gwr .tabs{display:flex;flex-wrap:wrap;gap:8px}
+.gwr .tabs label{padding:10px 16px;border-radius:999px;background:#fff;border:1px solid #ECDBD8;font-size:13px;font-weight:700;color:#6E4F53;cursor:pointer}
+.gwr .tabs label:hover{background:#FEF0F1}
+.gwr .u,.gwr .d{display:none}
+#uc1:checked ~ .tabs label[for=uc1]{background:#9E1B2E;color:#fff;border-color:#9E1B2E}#uc1:focus-visible ~ .tabs label[for=uc1]{outline:2px solid #1C1012;outline-offset:2px}#uc1:checked ~ .stage .u1{display:inline}#uc1:checked ~ .desc .d1{display:block}
+#uc2:checked ~ .tabs label[for=uc2]{background:#9E1B2E;color:#fff;border-color:#9E1B2E}#uc2:focus-visible ~ .tabs label[for=uc2]{outline:2px solid #1C1012;outline-offset:2px}#uc2:checked ~ .stage .u2{display:inline}#uc2:checked ~ .desc .d2{display:block}
+#uc3:checked ~ .tabs label[for=uc3]{background:#9E1B2E;color:#fff;border-color:#9E1B2E}#uc3:focus-visible ~ .tabs label[for=uc3]{outline:2px solid #1C1012;outline-offset:2px}#uc3:checked ~ .stage .u3{display:inline}#uc3:checked ~ .desc .d3{display:block}
+#uc4:checked ~ .tabs label[for=uc4]{background:#9E1B2E;color:#fff;border-color:#9E1B2E}#uc4:focus-visible ~ .tabs label[for=uc4]{outline:2px solid #1C1012;outline-offset:2px}#uc4:checked ~ .stage .u4{display:inline}#uc4:checked ~ .desc .d4{display:block}
+#uc5:checked ~ .tabs label[for=uc5]{background:#9E1B2E;color:#fff;border-color:#9E1B2E}#uc5:focus-visible ~ .tabs label[for=uc5]{outline:2px solid #1C1012;outline-offset:2px}#uc5:checked ~ .stage .u5{display:inline}#uc5:checked ~ .desc .d5{display:block}
+.gwr .tabs label { user-select: none; }
