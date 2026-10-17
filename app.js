@@ -1316,7 +1316,6 @@ function showView(name) {
   if (name === 'scanner') prepareScanner();
   if (name === 'files' && leaving !== 'files') resetPbState();
   if (name === 'settings') loadSettingsUI();
-  if (name === 'gateway') renderGatewayPage();
 
   currentView = name;
   markNav(name);
@@ -1345,16 +1344,6 @@ function syncAppChrome() {
   const dot = (id, on) => { const el = document.getElementById(id); if (el) el.classList.toggle('on', on); };
   dot('dotGuard', hasKey);
   dot('dotGateway', !!serverGateway.configured);
-  if (currentView === 'gateway') renderGatewayPage();
-}
-
-// ── AI Gateway page: the diagram is static; only the status tag is live ──
-function renderGatewayPage() {
-  const on = isGatewayOn();
-  const tag = document.getElementById('gwStateTag');
-  if (!tag) return;
-  tag.className = 'tag ' + (on ? 'ok' : serverGateway.configured ? '' : 'warn');
-  tag.textContent = on ? t('gw.on') : serverGateway.configured ? t('gw.off') : t('gw.notConfigured');
 }
 
 // ── Preflight (M7): /api/gateway/health runs every check for real ──
