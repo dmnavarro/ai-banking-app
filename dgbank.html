@@ -450,13 +450,15 @@
         <div class="panel-title-row"><h2 data-i18n="fs.fromLink">Scan from a link</h2></div>
         <p class="muted" data-i18n="fs.fromLinkBody">Paste a link to a bill. File Security fetches and scans it first.</p>
         <div class="pb-url-panel visible" id="pbUrlPanel">
-          <label class="fld"><span data-i18n="fs.fileUrl">File URL</span>
-            <input class="pb-url-input" id="pbUrlInput" type="url" placeholder="https://" onkeydown="if(event.key==='Enter')scanFromUrl()"></label>
-          <button class="btn-ghost" id="pbUrlScanBtn" onclick="scanFromUrl()" data-i18n="fs.fetchScan">Fetch and scan</button>
-          <div class="pb-url-hint">
+          <div class="fs-url-box">
+            <svg class="fs-url-ic" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>
+            <input class="pb-url-input" id="pbUrlInput" type="url" placeholder="https://example.com/bill.pdf" aria-label="File URL" onkeydown="if(event.key==='Enter')scanFromUrl()">
+            <button class="btn-primary" id="pbUrlScanBtn" onclick="scanFromUrl()" data-i18n="fs.fetchScan">Fetch and scan</button>
+          </div>
+          <div class="fs-samples">
             <span data-i18n="fs.eicarHint">Try the EICAR test file:</span>
-            <a href="#" onclick="event.preventDefault();document.getElementById('pbUrlInput').value='https://secure.eicar.org/eicar.com.txt'">eicar.com.txt</a> ·
-            <a href="#" onclick="event.preventDefault();document.getElementById('pbUrlInput').value='https://secure.eicar.org/eicar_com.zip'">eicar_com.zip</a>
+            <button type="button" class="fs-chip" onclick="document.getElementById('pbUrlInput').value='https://secure.eicar.org/eicar.com.txt';document.getElementById('pbUrlInput').focus()">eicar.com.txt</button>
+            <button type="button" class="fs-chip" onclick="document.getElementById('pbUrlInput').value='https://secure.eicar.org/eicar_com.zip';document.getElementById('pbUrlInput').focus()">eicar_com.zip</button>
           </div>
         </div>
       </div>

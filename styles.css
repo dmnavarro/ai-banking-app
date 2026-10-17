@@ -1820,7 +1820,21 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .paybills-page .pb-dropzone-icon svg { width: 22px; height: 22px; }
 .paybills-page .pb-dropzone-title { color: var(--maroon); font-weight: 700; }
 .paybills-page .pb-dropzone-sub { color: #8A6E72; font-size: .82rem; }
-.paybills-page .pb-url-panel { display: block; }
+.paybills-page .pb-url-panel { display: flex; flex-direction: column; gap: .9rem; margin-top: 1rem; }
+/* Scan from a link: one search-style bar (icon, URL, button) and test-file chips */
+.fs-url-box { display: flex; align-items: center; gap: .5rem; padding: .35rem .35rem .35rem .9rem; border: 1.5px solid #ECDBD8; border-radius: 999px; background: #FFFBFB; transition: border-color .18s, box-shadow .18s; }
+.fs-url-box:focus-within { border-color: var(--maroon); box-shadow: 0 0 0 3px rgba(158,27,46,.12); background: #fff; }
+.fs-url-box .fs-url-ic { width: 18px; height: 18px; flex-shrink: 0; color: #A88A8E; }
+.paybills-page .fs-url-box .pb-url-input { flex: 1; min-width: 0; border: 0; background: transparent; padding: .55rem .2rem; font-size: .92rem; color: #1A0A0D; }
+.paybills-page .fs-url-box .pb-url-input:focus { background: transparent; }
+.fs-url-box .btn-primary { flex-shrink: 0; padding: .6rem 1.15rem; }
+.fs-samples { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; font-size: .82rem; color: #8A6E72; }
+.fs-chip { border: 1px solid #ECDBD8; background: #fff; color: var(--maroon); border-radius: 999px; padding: .3rem .75rem; font: 600 .8rem/1.2 inherit; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; cursor: pointer; }
+.fs-chip:hover { background: #FEF0F1; border-color: #F2C6CC; }
+@media (max-width: 480px) {
+  .fs-url-box { flex-wrap: wrap; border-radius: 16px; padding: .5rem; }
+  .fs-url-box .btn-primary { width: 100%; }
+}
 .pb-live:not(:has(.visible)) { display: none; }
 .pb-live { margin-bottom: 1.25rem; }
 
