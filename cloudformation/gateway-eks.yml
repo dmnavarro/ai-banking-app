@@ -27,11 +27,12 @@ Parameters:
 
   NodeInstanceType:
     Type: String
-    Default: c7i.xlarge
+    Default: t3.xlarge
     AllowedValues: [t3.large, t3.xlarge, c7i.xlarge, m6i.large, m6i.xlarge, m7i.large, m7i.xlarge]
     Description: >
-      EC2 instance type for the gateway node. c7i.xlarge (4 fast vCPU / 8 GB) speeds up
-      guardrail scans; m7i.xlarge has the same cores with 16 GB if memory gets tight.
+      EC2 instance type for the gateway node. t3.xlarge (4 vCPU / 16 GB) is the tested size.
+      On c7i the gateway's sensitive-data scanner (skyeyes_scanner, chart 0.1.159) fails to
+      initialise, and the gateway then skips every guardrail scan.
 
   NodeCount:
     Type: Number
