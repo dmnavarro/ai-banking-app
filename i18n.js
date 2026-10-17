@@ -14,7 +14,7 @@ const I18N = {
     'scanner.presetDirect': 'DG Bank app (direct)', 'scanner.presetGateway': 'Via AI Gateway',
     // ── Redesign: navigation, pages ──
     'sb.home': 'Home', 'sb.assistant': 'Chatbot Assistant', 'sb.aiSecurity': 'AI Security', 'sb.scanner': 'AI Scanner',
-    'sb.gateway': 'AI Gateway', 'sb.aiGateway': 'AI Gateway', 'sb.useCases': 'Use Cases', 'gw.title': 'AI Gateway use cases', 'sb.agents': 'Laptop Agents', 'sb.settings': 'Settings', 'sb.cloudSecurity': 'Cloud Security', 'sb.fileSecurity': 'File Security',
+    'sb.gateway': 'AI Gateway', 'sb.aiGateway': 'AI Gateway', 'sb.howItWorks': 'How It Works', 'gw.title': 'AI Gateway use cases', 'sb.agents': 'Laptop Agents', 'sb.settings': 'Settings', 'sb.cloudSecurity': 'Cloud Security', 'sb.fileSecurity': 'File Security',
     'sb.container': 'Container Security', 'sb.ips': 'Cloud IPS', 'sb.code': 'Code Security', 'sb.crem': 'CREM for Cloud',
     'sb.logout': 'Log out', 'sb.accounts': 'Accounts', 'sb.transfer': 'Transfer', 'tab.files': 'Files', 'tab.more': 'More',
     'home.morning': 'Good morning', 'home.afternoon': 'Good afternoon', 'home.evening': 'Good evening',
@@ -32,7 +32,7 @@ const I18N = {
     'xfer.done': 'Transfer of {amount} to {to} scheduled (demo: nothing moves).',
     'offers.title': 'For you', 'offers.sub': 'Offers for you', 'offers.trial': 'TrendAI Vision One free trial',
     'offers.sales': 'Contact your sales representative for competitive offers', 'offers.freeTrial': 'Free trial', 'offers.talkSales': 'Talk to sales', 'offers.contactRep': 'Ask your Trend Micro representative about this offer.',
-    'gw.sub': 'These are the five use cases you’ll see in this demo, and how each call flows through the gateway. Pick one to watch the request, the response and any tool call.',
+    'gw.sub': 'These are the six use cases you’ll see in this demo, and how each call flows through the gateway. Pick one to watch the request, the response and any tool call.',
     'gw.on': 'Gateway on', 'gw.off': 'Gateway off', 'gw.notConfigured': 'Not configured',
     'set.language': 'Language', 'toast.settingsSaved': 'Settings saved.', 'toast.soon': 'Coming soon in this demo.',
     'fs.sub': 'Upload a bill and the file is scanned before it is processed', 'fs.scannedBy': 'Scanned by Vision One File Security',

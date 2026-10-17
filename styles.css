@@ -1929,6 +1929,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 #uc3:checked ~ .tabs label[for=uc3]{background:#9E1B2E;color:#fff;border-color:#9E1B2E}#uc3:focus-visible ~ .tabs label[for=uc3]{outline:2px solid #1C1012;outline-offset:2px}#uc3:checked ~ .stage .u3{display:inline}#uc3:checked ~ .desc .d3{display:block}
 #uc4:checked ~ .tabs label[for=uc4]{background:#9E1B2E;color:#fff;border-color:#9E1B2E}#uc4:focus-visible ~ .tabs label[for=uc4]{outline:2px solid #1C1012;outline-offset:2px}#uc4:checked ~ .stage .u4{display:inline}#uc4:checked ~ .desc .d4{display:block}
 #uc5:checked ~ .tabs label[for=uc5]{background:#9E1B2E;color:#fff;border-color:#9E1B2E}#uc5:focus-visible ~ .tabs label[for=uc5]{outline:2px solid #1C1012;outline-offset:2px}#uc5:checked ~ .stage .u5{display:inline}#uc5:checked ~ .desc .d5{display:block}
+#uc6:checked ~ .tabs label[for=uc6]{background:#9E1B2E;color:#fff;border-color:#9E1B2E}#uc6:focus-visible ~ .tabs label[for=uc6]{outline:2px solid #1C1012;outline-offset:2px}#uc6:checked ~ .stage .u6{display:inline}#uc6:checked ~ .desc .d6{display:block}
 .gwr .tabs label { user-select: none; }
 
 /* M7: preflight on the AI Gateway page; scanner before/after targets and Vision One link */

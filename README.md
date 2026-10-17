@@ -547,7 +547,7 @@ Every pod must print `"loaded":true`. If new pods go Pending under load, move th
 
 ### Full-screen demo view
 
-**Chatbot Assistant** in the sidebar opens this view (on a phone, the Assistant tab opens the chat full screen instead).
+**AI Gateway** in the sidebar opens this view (on a phone, the Assistant tab opens the chat full screen instead).
 
 Open `https://<your-app>/?view=demo`, or click the expand icon in the chat header. The chat fills the screen and a **Request trace** panel on the right shows each step of every request — prompt sent, AI Guard or AI Gateway decision, model reply, response shown — with the layer that decided and how long it took. **Vision One Events ↗** opens the gateway's Events page, which stays the system of record.
 
