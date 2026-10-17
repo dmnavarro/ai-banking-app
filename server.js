@@ -124,14 +124,25 @@ async function openAiChat(baseUrl, apiKey, model, messages, timeoutMs = 45000) {
   try {
     const upstream = await fetch(`${baseUrl}/v1/chat/completions`, {
       method:  'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization':   `Bearer ${apiKey}`,
+        'Content-Type':    'application/json',
+        'Accept':          'application/json',
+        // Ask for an uncompressed body. curl (no compression) gets normal replies from the
+        // gateway, while Node's default Accept-Encoding got a 200 the app couldn't parse.
+        'Accept-Encoding': 'identity',
+      },
       body:    JSON.stringify({ model, messages, max_tokens: 2048, temperature: 0.7 }),
       signal:  controller.signal,
     });
     const text = await upstream.text();
     let data;
     try { data = JSON.parse(text); } catch (_) { data = { raw: text.slice(0, 2000) }; }
-    return { ok: upstream.ok, status: upstream.status, data };
+    const headers = {
+      'content-type':     upstream.headers.get('content-type'),
+      'content-encoding': upstream.headers.get('content-encoding'),
+    };
+    return { ok: upstream.ok, status: upstream.status, data, headers };
   } finally {
     clearTimeout(timer);
   }
@@ -207,7 +218,7 @@ app.post('/api/chat', async (req, res) => {
       const reply = extractReply(r.data);
       if (!reply) {
         // 200 without answer text — log what came back (e.g. finish_reason, a non-JSON body)
-        console.log(`[Gateway] empty reply, body: ${JSON.stringify(r.data).slice(0, 1500)}`);
+        console.log(`[Gateway] empty reply, headers: ${JSON.stringify(r.headers)} body: ${JSON.stringify(r.data).slice(0, 1500)}`);
       }
       return res.json({
         route: 'gateway', identity,
@@ -231,7 +242,7 @@ app.post('/api/chat', async (req, res) => {
         return res.status(502).json({ error: msg });
       }
       const reply = extractReply(r.data);
-      if (!reply) console.log(`[Direct] empty reply, body: ${JSON.stringify(r.data).slice(0, 1500)}`);
+      if (!reply) console.log(`[Direct] empty reply, headers: ${JSON.stringify(r.headers)} body: ${JSON.stringify(r.data).slice(0, 1500)}`);
       return res.json({
         route: 'direct',
         model: r.data?.model || DIRECT_LLM_MODEL,
