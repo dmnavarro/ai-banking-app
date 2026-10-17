@@ -1404,6 +1404,7 @@ const CLOUD_PAGES = {
       'Detects unexpected processes, file changes and network behaviour inside the container.',
       'Catches an attacker who gets past the application layer.',
     ],
+    v1Path: 'server-cloud/container-security',
     demo: 'Not interactive in the app. Show the ECS cluster and its runtime events in the Vision One console.',
   },
   ips: {
@@ -1414,6 +1415,7 @@ const CLOUD_PAGES = {
       'Trend partner-managed rule groups for client exploits, server exploits and malware.',
       'Alert mode: matching traffic is logged to Vision One without being dropped.',
     ],
+    v1Path: 'cloud-ips',
     demo: 'Run a web scanner against the app URL (for example nikto -h https://<app-url>) and watch events arrive in Network Security → Cloud IPS within seconds.',
   },
   code: {
@@ -1424,6 +1426,7 @@ const CLOUD_PAGES = {
       'Finds vulnerabilities, secrets and malware in the source and dependencies.',
       'Runs before the container image reaches ECS.',
     ],
+    v1Path: 'code-security',
     demo: 'Open the latest "Build and Deploy to ECS" run in GitHub Actions and expand the Code Security Scan (TMAS) step.',
   },
   crem: {
@@ -1434,12 +1437,15 @@ const CLOUD_PAGES = {
       'Misconfigurations, identity risk and an exposure score for the environment.',
       'Shows risk beyond workload protection.',
     ],
+    v1Path: 'server-cloud/cloud-posture/misconfiguration-compliance',
     demo: 'Open Cyber Risk Exposure Management in Vision One and filter to this AWS account.',
   },
 };
 function renderCloudPages() {
   const region = localStorage.getItem('visionone_region') || 'sg';
   const portal = `https://${PORTAL_HOSTS[region] || PORTAL_HOSTS.sg}/`;
+  const fsLink = document.getElementById('fsV1Link');
+  if (fsLink) fsLink.href = `${portal}#/app/file-security`;
   for (const [key, p] of Object.entries(CLOUD_PAGES)) {
     const el = document.querySelector(`.view[data-view="${key}"]`);
     if (!el) continue;
@@ -1451,7 +1457,7 @@ function renderCloudPages() {
           <ul class="check-points">${p.points.map(x => `<li>${escHtml(x)}</li>`).join('')}</ul></div>
         <div class="panel-card"><div class="panel-title-row"><h2>${t('cloud.howToShow')}</h2></div>
           <p class="muted">${escHtml(p.demo)}</p>
-          <a class="btn-ghost" href="${portal}" target="_blank" rel="noopener">${t('cloud.openV1')} ↗</a></div>
+          <a class="btn-ghost" href="${portal}#/app/${p.v1Path}" target="_blank" rel="noopener">${t('cloud.openV1')} ↗</a></div>
       </div>`;
   }
 }
