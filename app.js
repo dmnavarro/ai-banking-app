@@ -510,6 +510,14 @@ async function callAIGuard(prompt) {
     let data;
     try { data = JSON.parse(text); } catch(_) { data = {}; }
 
+    // Some detections come back as an HTTP error rather than action:"Block", e.g.
+    //   403 {"error":{"code":"SensitiveDataDetected","message":"credit card detected"}}
+    // That's a live verdict, not an outage — show it as a block instead of falling back.
+    const errCode = data?.error?.code || '';
+    if (!resp.ok && resp.status < 500 && /Detected$/i.test(errCode)) {
+      return { blocked: true, source: 'live', reasons: [data.error.message || errCode], raw: data };
+    }
+
     if (!resp.ok) {
       console.warn('[AI Guard] API error', resp.status, '— falling back to demo');
       return { ...demoFallback(prompt), apiStatus: resp.status };
