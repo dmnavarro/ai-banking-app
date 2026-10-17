@@ -24,6 +24,8 @@ GITHUB_ORG=""
 GITHUB_REPO="ai-banking-app"
 CERTIFICATE_ARN=""
 GATEWAY_URL=""
+DIRECT_LLM_URL=""
+DIRECT_LLM_MODEL=""
 
 usage() {
   cat <<EOF
@@ -40,6 +42,8 @@ Optional:
   --bedrock-model    Bedrock model ID (default: us.deepseek.r1-v1:0)
   --certificate-arn  ACM certificate ARN for HTTPS (optional)
   --gateway-url      AI Gateway LLM endpoint from deploy-gateway.sh --expose (optional)
+  --direct-llm-url   OpenAI-compatible base URL for the no-gateway route, e.g. https://api.groq.com/openai
+  --direct-llm-model Model ID for --direct-llm-url, e.g. openai/gpt-oss-120b
   --skip-oidc        Skip GitHub OIDC provider creation if it already exists
   --stack-name       CloudFormation stack name (default: dgbank-ai-app-demo-ecs)
   --help             Show this help
@@ -57,6 +61,8 @@ while [[ $# -gt 0 ]]; do
     --bedrock-model)   BEDROCK_MODEL_ID="$2";  shift 2 ;;
     --certificate-arn) CERTIFICATE_ARN="$2";  shift 2 ;;
     --gateway-url)     GATEWAY_URL="$2";       shift 2 ;;
+    --direct-llm-url)  DIRECT_LLM_URL="$2";    shift 2 ;;
+    --direct-llm-model) DIRECT_LLM_MODEL="$2"; shift 2 ;;
     --skip-oidc)       CREATE_OIDC="false";    shift ;;
     --stack-name)      STACK_NAME="$2";        shift 2 ;;
     --help)            usage ;;
@@ -110,6 +116,21 @@ if [[ -n "$GATEWAY_URL" ]]; then
   echo ""
 fi
 
+if [[ -n "$DIRECT_LLM_URL" ]]; then
+  if [[ -z "$DIRECT_LLM_MODEL" ]]; then
+    echo "Error: --direct-llm-model is required with --direct-llm-url"
+    exit 1
+  fi
+  if ! aws ssm get-parameter --name /dgbank/direct-llm-key --region "$REGION" > /dev/null 2>&1; then
+    echo "Error: SSM parameter /dgbank/direct-llm-key not found (required with --direct-llm-url)."
+    echo "Create it with:"
+    echo "  aws ssm put-parameter --name /dgbank/direct-llm-key --type SecureString --value '<provider API key>' --region $REGION"
+    exit 1
+  fi
+  echo "Direct model: $DIRECT_LLM_MODEL at $DIRECT_LLM_URL (key found in SSM)"
+  echo ""
+fi
+
 # ---------------------------------------------------------------------------
 # Step 1 — Ensure ECR repository exists
 # ---------------------------------------------------------------------------
@@ -141,10 +162,11 @@ echo ""
 # ---------------------------------------------------------------------------
 # Step 3 — Deploy CloudFormation stack
 # ---------------------------------------------------------------------------
-# Only pass GatewayBaseUrl when --gateway-url is given, so a later run without
-# it keeps the value already on the stack
+# Only pass the gateway / direct-model settings when their flags are given, so a
+# later run without them keeps the values already on the stack
 GATEWAY_OVERRIDE=()
-[[ -n "$GATEWAY_URL" ]] && GATEWAY_OVERRIDE=(GatewayBaseUrl="$GATEWAY_URL")
+[[ -n "$GATEWAY_URL" ]] && GATEWAY_OVERRIDE+=(GatewayBaseUrl="$GATEWAY_URL")
+[[ -n "$DIRECT_LLM_URL" ]] && GATEWAY_OVERRIDE+=(DirectLlmBaseUrl="$DIRECT_LLM_URL" DirectLlmModel="$DIRECT_LLM_MODEL")
 
 echo "Deploying CloudFormation stack: $STACK_NAME ..."
 aws cloudformation deploy \

@@ -318,6 +318,46 @@ Then point the app at the gateway (the LLM address from `--expose`). The ECS tas
   --gateway-url http://<internal-nlb>:8080
 ```
 
+### Step 6 — Models and routing
+
+In the console, under **Resources → LLM**, add each provider as type **OpenAI** and type the values (pasted or autofilled values may not save in the preview):
+
+| Provider | Base URL | Model | Alias |
+|---|---|---|---|
+| `groq` | `https://api.groq.com/openai` | `openai/gpt-oss-120b` | `openai` |
+| `bedrock` | `https://bedrock-mantle.us-east-1.api.aws` | `deepseek.v3.2` | `deepseek` |
+
+> **Base URL without `/v1`.** The gateway appends `/v1/chat/completions` itself — a URL ending in `/v1` gives a 404 for `/v1/v1/chat/completions`.
+
+The Bedrock secret is a **Bedrock API key** (Bedrock console → API keys, in us-east-1). The Groq secret is a Groq API key.
+
+Then **Controls → Routing Rules**: rule `dgbank-chat`, **Status: Enabled**, priority `0`, requested model `dgbank-chat`, alias `openai`, fallback alias `deepseek`. The app only ever asks for `dgbank-chat`, so models are swapped in the console without touching the app.
+
+To compare like for like, give the no-gateway route the same Groq model:
+
+```bash
+aws ssm put-parameter --region ap-southeast-1 --type SecureString --overwrite \
+  --name /dgbank/direct-llm-key --value '<Groq API key>'
+
+./deploy-ecs.sh --github-org <your-github-username> --skip-oidc \
+  --gateway-url http://<internal-nlb>:8080 \
+  --direct-llm-url https://api.groq.com/openai --direct-llm-model openai/gpt-oss-120b
+```
+
+Without `--direct-llm-url`, the no-gateway route keeps using DeepSeek-R1 on Bedrock.
+
+### Using the Gateway pill
+
+The chat header has two linked pills — **Guard** and **Gateway**. Turning one on turns the other off; both off means no protection.
+
+| Mode | What happens |
+|---|---|
+| Both off | App → model. Attack presets use the scripted "unprotected" replies |
+| Guard on | App → AI Guard (prompt) → model → AI Guard (reply) → app |
+| Gateway on | App → AI Gateway → model. No AI Guard calls from the app — the gateway is the only enforcement point |
+
+Replies through the gateway carry an **AI Gateway · Allowed** badge with the model that answered. A request the gateway stops shows the block card with the gateway's HTTP status and message. The gear drawer shows the gateway endpoint, model and identities the server is configured with.
+
 ### Tear down
 
 ```bash
@@ -471,6 +511,8 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | `--bedrock-model` | `us.deepseek.r1-v1:0` | Bedrock model ID (cross-region inference profile) |
 | `--certificate-arn` | *(empty)* | ACM cert ARN for HTTPS |
 | `--gateway-url` | *(unchanged)* | AI Gateway LLM endpoint from `deploy-gateway.sh --expose`; needs the two `/dgbank/gateway-key-*` SSM parameters |
+| `--direct-llm-url` | *(unchanged)* | OpenAI-compatible base URL for the no-gateway route (e.g. `https://api.groq.com/openai`); needs SSM `/dgbank/direct-llm-key` |
+| `--direct-llm-model` | *(unchanged)* | Model for `--direct-llm-url`, e.g. `openai/gpt-oss-120b` |
 | `--skip-oidc` | *(off)* | Skip OIDC provider creation on re-runs |
 | `--stack-name` | `dgbank-ai-app-demo-ecs` | CloudFormation stack name |
 

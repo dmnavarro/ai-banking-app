@@ -711,6 +711,10 @@ nav ul li.active a, nav ul li a:hover { color: var(--navy); border-bottom-color:
 .chat-guard-pill.disabled     { background: rgba(255,255,255,.08); color: rgba(255,255,255,.4); border: 1px solid rgba(255,255,255,.15); cursor: pointer; }
 .chat-guard-pill.disabled:hover { background: rgba(255,255,255,.15); }
 .chat-guard-pill.scanning     { background: rgba(192,121,16,.2); color: #FBC44A; border: 1px solid rgba(192,121,16,.3); }
+.chat-guard-pill.gw-active    { background: rgba(59,130,246,.22); color: #93C5FD; border: 1px solid rgba(59,130,246,.4); cursor: pointer; }
+.chat-guard-pill.gw-active:hover { background: rgba(59,130,246,.35); }
+.chat-pills { display: flex; flex-direction: column; align-items: flex-end; gap: .25rem; flex-shrink: 0; }
+.chat-window.gateway-on { border-color: #3B82F6; box-shadow: 0 16px 60px rgba(30,6,8,.22), 0 0 0 2px rgba(59,130,246,.25); }
 
 .chat-header-btns { display: flex; gap: .4rem; }
 .chat-hbtn {
@@ -852,6 +856,7 @@ nav ul li.active a, nav ul li a:hover { color: var(--navy); border-bottom-color:
 .guard-badge.blocked   { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
 .guard-badge.demo      { background: #FFF8EC; color: #A06010; border: 1px solid #FDE68A; }
 .guard-badge.unconfigured { background: #F5F5F5; color: #777; border: 1px solid #E5E5E5; }
+.guard-badge.gateway   { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
 
 .msg-time { font-size: .63rem; color: var(--dim); margin-bottom: .15rem; flex-shrink: 0; }
 .msg.user .msg-time { text-align: right; }

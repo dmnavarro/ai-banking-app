@@ -50,11 +50,25 @@ Parameters:
       e.g. http://<internal-nlb>:8080. Leave empty to deploy without the gateway. When set,
       the SSM parameters /dgbank/gateway-key-assistant and /dgbank/gateway-key-ops must exist.
 
+  DirectLlmBaseUrl:
+    Type: String
+    Default: ""
+    Description: >
+      OpenAI-compatible base URL the app calls when the gateway is off (e.g. https://api.groq.com/openai),
+      so both routes use the same model. Leave empty to use Bedrock. When set, the SSM parameter
+      /dgbank/direct-llm-key must exist.
+
+  DirectLlmModel:
+    Type: String
+    Default: ""
+    Description: Model ID for DirectLlmBaseUrl, e.g. openai/gpt-oss-120b
+
 
 Conditions:
   ShouldCreateOIDC: !Equals [!Ref CreateOIDCProvider, "true"]
   HasCertificate: !Not [!Equals [!Ref CertificateArn, ""]]
   HasGateway: !Not [!Equals [!Ref GatewayBaseUrl, ""]]
+  HasDirectLlm: !Not [!Equals [!Ref DirectLlmBaseUrl, ""]]
 
 Resources:
 
@@ -544,6 +558,16 @@ Resources:
               - Name: GATEWAY_BASE_URL
                 Value: !Ref GatewayBaseUrl
               - !Ref AWS::NoValue
+            - !If
+              - HasDirectLlm
+              - Name: DIRECT_LLM_BASE_URL
+                Value: !Ref DirectLlmBaseUrl
+              - !Ref AWS::NoValue
+            - !If
+              - HasDirectLlm
+              - Name: DIRECT_LLM_MODEL
+                Value: !Ref DirectLlmModel
+              - !Ref AWS::NoValue
           Secrets:
             - Name: TMAS_API_KEY
               ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/tmas-api-key"
@@ -557,6 +581,12 @@ Resources:
               - HasGateway
               - Name: GATEWAY_KEY_OPS
                 ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/gateway-key-ops"
+              - !Ref AWS::NoValue
+            # Provider key for the direct (no gateway) route
+            - !If
+              - HasDirectLlm
+              - Name: DIRECT_LLM_API_KEY
+                ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/direct-llm-key"
               - !Ref AWS::NoValue
           LogConfiguration:
             LogDriver: awslogs
