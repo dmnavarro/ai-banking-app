@@ -432,6 +432,10 @@ Then show **Events** (identity, tool, rule) and **Dashboard → Recent deny even
 
 > **Say carefully.** In preview testing a Forbid won over a conflicting Allow, but it wasn't clear whether that's by design or because the Forbid was created later. If you show an Allow rule too, create it **before** the Forbid, and don't claim Forbid always wins. The model may occasionally ask "are you sure?" before a transfer — answer "yes"; if it refuses outright, **Clear** and resend.
 
+### Sensitive data (PII)
+
+The Dashboard's **PII** counter only counts *blocks*. Sensitive-data rules set to **Allow & log** with **Redact** on mask the value and count as *Guardrail policy – allow*. To show a PII block, set the **credit card** rules in the policy's **Sensitive Information → Rule management** to **Block**, then in Gateway mode send **Banking Queries → Card dispute** ("My card 4111 1111 1111 1111 was charged twice…" — the standard Visa test number). For response-side redaction, run **Agent Misuse → Profile harvest** in Test 4.
+
 ### Full-screen demo view
 
 Open `https://<your-app>/?view=demo`, or click the expand icon in the chat header. The chat fills the screen and a **Request trace** panel on the right shows each step of every request — prompt sent, AI Guard or AI Gateway decision, model reply, response shown — with the layer that decided and how long it took. **Vision One Events ↗** opens the gateway's Events page, which stays the system of record.

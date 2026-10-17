@@ -678,6 +678,9 @@
           <button class="preset-chip safe" onclick="sendPreset('Request a replacement debit card')" data-i18n="chat.presetReplaceCard">Replace card</button>
           <button class="preset-chip safe" onclick="sendPreset('What is my credit limit and available balance?')" data-i18n="chat.presetCredit">Credit status</button>
           <button class="preset-chip safe" onclick="sendPreset('Help me set up automatic bill pay')" data-i18n="chat.presetAutoBill">Auto bill pay</button>
+          <!-- Ordinary request that carries PII: 4111 1111 1111 1111 is the standard Visa test number
+               (passes the card checksum, not a real card) — triggers the sensitive-data guardrail -->
+          <button class="preset-chip safe" onclick="sendPreset('My card 4111 1111 1111 1111 was charged twice last week, can you check?')" data-i18n="chat.presetCardDispute">Card dispute</button>
         </div>
       </div>
 
