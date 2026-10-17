@@ -1444,6 +1444,8 @@ const CLOUD_PAGES = {
 function renderCloudPages() {
   const region = localStorage.getItem('visionone_region') || 'sg';
   const portal = `https://${PORTAL_HOSTS[region] || PORTAL_HOSTS.sg}/`;
+  const evLink = document.getElementById('agentsEventsLink');
+  if (evLink) evLink.href = gatewayEventsUrl();
   const fsLink = document.getElementById('fsV1Link');
   if (fsLink) fsLink.href = `${portal}#/app/file-security`;
   for (const [key, p] of Object.entries(CLOUD_PAGES)) {

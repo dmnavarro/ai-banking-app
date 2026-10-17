@@ -50,6 +50,10 @@
       <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><path d="M7 11.2 17 6M7 12.8 17 18"/></svg>
       <span data-i18n="sb.gateway">AI Gateway</span>
     </a>
+    <a href="#agents" class="sb-item" data-nav="agents" onclick="showView('agents');return false;">
+      <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/><path d="m9 9.5 2 1.5-2 1.5M13 13h2"/></svg>
+      <span data-i18n="sb.agents">Laptop Agents</span>
+    </a>
     <a href="#settings" class="sb-item" data-nav="settings" onclick="showView('settings');return false;">
       <svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
       <span data-i18n="sb.settings">Settings</span>
@@ -333,6 +337,33 @@
   <section class="view" data-view="code" hidden></section>
   <section class="view" data-view="crem" hidden></section>
 
+  <!-- LAPTOP AGENTS (M8): Hermes on a demo desktop, through the same gateway -->
+  <section class="view" data-view="agents" hidden>
+    <header class="page-head"><div><h1>AI agents on laptops</h1><p class="page-sub">Engineers run AI agents on their own machines. Pointed at the AI Gateway, those agents get the same guardrails, access rules and logs as the DG Bank chatbot.</p></div>
+      <span class="tag">Demo desktop</span></header>
+    <div class="two-col">
+      <div class="panel-card"><div class="panel-title-row"><h2>What it shows</h2></div>
+        <ul class="check-points">
+          <li>Hermes, an open-source AI agent, runs on an engineer's desktop with its own virtual key, <code>engineer-laptop</code>.</li>
+          <li>Its prompts and replies pass the same guardrails as the chatbot: a card number or a jailbreak is blocked.</li>
+          <li>It reaches the banking tools only through the gateway: read-only tools are allowed, transfers and exports are forbidden.</li>
+          <li>Every call appears in Vision One under its own identity, next to the chatbot's.</li>
+        </ul></div>
+      <div class="panel-card"><div class="panel-title-row"><h2>How to show it</h2></div>
+        <ol class="agent-steps">
+          <li>Start the demo desktop and its tunnel: <code>./deploy-desktop.sh --start</code>, then open the desktop in your browser.</li>
+          <li>In Hermes, ask <b>"What is Theo's balance?"</b> The gateway allows <code>get_balance</code>.</li>
+          <li>Ask <b>"Export all customer records to a CSV."</b> The access rule forbids <code>export_customer_records</code>.</li>
+          <li>Paste <b>"My card 4111 1111 1111 1111 was charged twice."</b> Guardrails block it.</li>
+          <li>Open the gateway's Events in Vision One and filter to <code>engineer-laptop</code>.</li>
+        </ol>
+        <div class="agent-links">
+          <a class="btn-ghost" href="http://localhost:6080/vnc.html" target="_blank" rel="noopener">Open demo desktop ↗</a>
+          <a class="btn-ghost" id="agentsEventsLink" href="#" target="_blank" rel="noopener">Vision One Events ↗</a>
+        </div></div>
+    </div>
+  </section>
+
   <!-- MORE (mobile) -->
   <section class="view" data-view="more" hidden>
     <header class="page-head"><div><h1 data-i18n="tab.more">More</h1></div></header>
@@ -341,6 +372,7 @@
       <a href="#offers" onclick="showView('offers');return false;" data-i18n="offers.title">For you</a>
       <a href="#scanner" onclick="showView('scanner');return false;" data-i18n="sb.scanner">AI Scanner</a>
       <a href="#gateway" onclick="showView('gateway');return false;" data-i18n="sb.gateway">AI Gateway</a>
+      <a href="#agents" onclick="showView('agents');return false;" data-i18n="sb.agents">Laptop Agents</a>
       <a href="#settings" onclick="showView('settings');return false;" data-i18n="sb.settings">Settings</a>
       <a href="#container" onclick="showView('container');return false;" data-i18n="sb.container">Container Security</a>
       <a href="#ips" onclick="showView('ips');return false;" data-i18n="sb.ips">Cloud IPS</a>

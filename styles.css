@@ -1888,6 +1888,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   .page-head > div { flex: 1; min-width: 60%; }
   .page-head > .tag, .page-head > .avatar { margin-left: auto; }
   .page-head > .fs-badge { margin-left: 0; }
+  /* A long subtitle takes the full width; the tag moves under it instead of squeezing the title */
+  .page-head:has(.page-sub) > div { flex-basis: 100%; }
+  .page-head:has(.page-sub) > .tag { margin-left: 0; }
 }
 
 /* Live status: the green protection dots pulse, and the chat button pulses like the old AI Scanner button */
@@ -1933,3 +1936,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .gw-cta a, .gwr .d-try a { color: #9E1B2E; font-weight: 700; }
 .gwr .d-try { display: block; margin-top: .35rem; font-size: 13px; color: #8A6A6E; }
 .gwr .d-try code { font-size: 12px; }
+
+/* Laptop Agents page */
+.agent-steps { padding-left: 1.2rem; display: flex; flex-direction: column; gap: .5rem; font-size: .92rem; color: #4A3236; }
+.agent-steps code, .check-points code { font-size: .82rem; }
+.agent-links { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
