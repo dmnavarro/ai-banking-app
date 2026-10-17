@@ -943,7 +943,7 @@ async function sendMessage() {
   traceBegin(text, hasGateway ? 'gateway' : hasGuard ? 'guard' : 'off');
   traceStep('app', 'info', 'Prompt sent',
     (hasGateway ? `Via AI Gateway as ${identityLabel(chatIdentity())}` : hasGuard ? 'App-side Guard scans it first' : 'Straight to the model, no protection')
-    + (hasTools ? ' · tools on' : ''));
+    + (hasTools ? ' · MCP tools on' : ''));
 
   // Set scanning state in header pill
   if (hasGuard) {
@@ -1168,15 +1168,15 @@ function updateDemoBar() {
     btn.classList.toggle('active', n === active);
     btn.disabled = scanning || !scenarioAvailable(n);
     btn.title = !scenarioAvailable(n)
-      ? (SCENARIOS[n].tools ? 'Banking tools not configured for this route' : SCENARIOS[n].gateway ? 'AI Gateway not configured' : 'AI Guard not configured')
+      ? (SCENARIOS[n].tools ? 'MCP tools not configured for this route' : SCENARIOS[n].gateway ? 'AI Gateway not configured' : 'AI Guard not configured')
       : '';
   });
   const tools = document.getElementById('toolsSwitch');
   if (tools) {
     tools.disabled = !toolsAvailable() || scanning;
     tools.classList.toggle('on', isToolsOn());
-    tools.textContent = `Tools · ${isToolsOn() ? 'On' : 'Off'}`;
-    tools.title = toolsAvailable() ? 'Give C-3PO its banking tools' : 'Banking tools not configured for this route';
+    tools.textContent = `MCP Tools · ${isToolsOn() ? 'On' : 'Off'}`;
+    tools.title = toolsAvailable() ? 'Give C-3PO the banking tools on the DG Bank MCP server' : 'MCP tools not configured for this route';
   }
   const idSel = document.getElementById('identitySelect');
   if (idSel) {
@@ -1208,7 +1208,7 @@ function setChatIdentity(id) {
 // ── Trace store ──
 const traces = [];
 let currentTrace = null;
-const TRACE_LAYERS = { app: 'App', guard: 'AI Guard', gateway: 'AI Gateway', model: 'Model', tool: 'Tool' };
+const TRACE_LAYERS = { app: 'App', guard: 'AI Guard', gateway: 'AI Gateway', model: 'Model', tool: 'MCP tool' };
 const TRACE_MODES  = { off: 'No protection', guard: 'App-side Guard', gateway: 'AI Gateway' };
 
 function traceBegin(text, mode) {

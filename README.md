@@ -400,8 +400,8 @@ Tools need an OpenAI-compatible model (`--direct-llm-url`) on the no-gateway rou
 
 | Test | Route | What to show |
 |---|---|---|
-| 3 · Tools, no gateway | App → model; tools called directly on the MCP server | "Show my recent transactions" returns data; Data Exfiltration really runs `export_customer_records` and downloads the CSV |
-| 4 · Tools + gateway | App → gateway → model; tools through the gateway's Connect URL | Same requests; a Forbid rule on `export_customer_records` (Controls → Access Control) stops the export, and Events shows it |
+| 3 · MCP tools, no gateway | App → model; tools called directly on the MCP server | "Show my recent transactions" returns data; Data Exfiltration really runs `export_customer_records` and downloads the CSV |
+| 4 · MCP tools + gateway | App → gateway → model; tools through the gateway's Connect URL | Same requests; a Forbid rule on `export_customer_records` (Controls → Access Control) stops the export, and Events shows it |
 
 Tool calls appear as chips above the reply and as rows in the demo view's trace.
 
@@ -413,8 +413,8 @@ The top bar holds:
 
 | Control | What it does |
 |---|---|
-| **Test 1–4** | Sets Guard, Gateway and Tools in one click (the four baseline cases). Tests 3–4 need the banking tools (step 7) |
-| **Tools** | Gives C-3PO its banking tools |
+| **Test 1–4** | Sets Guard, Gateway and MCP Tools in one click (the four baseline cases). Tests 3–4 need the banking tools (step 7) |
+| **MCP Tools** | Gives C-3PO the banking tools on the DG Bank MCP server |
 | **Chat as** | Which virtual key the server sends to the gateway: `c3po-assistant` (Retail Digital) or `ops-analyst-agent` (Fraud and Ops). Only affects Gateway mode |
 | **Clear** | Clears the conversation, model history and trace |
 | **Exit** | Back to the banking dashboard (also drops `?view=demo`) |
