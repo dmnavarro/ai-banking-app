@@ -611,6 +611,8 @@ function addBotMsg(text, guardResult) {
     else if (guardResult.source === 'demo')     badge = '<div><span class="guard-badge demo">🛡️ AI Guard · Demo mode</span></div>';
     else if (guardResult.source === 'fallback') badge = '<div><span class="guard-badge demo" title="Live API unavailable — using pattern matching">🛡️ AI Guard · Demo fallback</span></div>';
     else if (guardResult.source === 'off')      badge = '<div><span class="guard-badge unconfigured">🛡️ AI Guard · Off</span></div>';
+    else if (guardResult.source === 'gateway' && guardResult.blockedTools?.length)
+      badge = `<div><span class="guard-badge blocked">🛰️ AI Gateway · Tool call blocked · ${escHtml([...new Set(guardResult.blockedTools)].join(', '))}</span></div>`;
     else if (guardResult.source === 'gateway')  badge = `<div><span class="guard-badge gateway">🛰️ AI Gateway · ${redacted ? 'Redacted' : 'Allowed'}${guardResult.model ? ' · ' + guardResult.model.replace(/</g,'&lt;') : ''}</span></div>`;
   }
 
@@ -1050,7 +1052,11 @@ async function sendMessage() {
       }
 
       removeTypingIndicator();
-      addBotMsg(result.reply, hasGateway ? { ...guardResult, model: result.model } : guardResult);
+      // Tool calls the gateway refused — the reply itself was allowed, so say what was blocked
+      const blockedTools = (result.toolTrace || [])
+        .filter(t => t.step === 'call' && t.status === 'denied')
+        .map(t => String(t.tool).replace(/^.*__/, ''));
+      addBotMsg(result.reply, hasGateway ? { ...guardResult, model: result.model, blockedTools } : guardResult);
       traceStep('app', protectedMode ? 'ok' : 'warn', 'Response shown', protectedMode ? '' : 'Nothing checked this reply');
 
       // Data Exfiltration — auto-download after scripted "transfer" completes
