@@ -405,6 +405,8 @@ Tools need an OpenAI-compatible model (`--direct-llm-url`) on the no-gateway rou
 
 Tool calls appear as chips above the reply and as rows in the demo view's trace.
 
+**Agent Misuse presets.** With MCP Tools on, the Malicious Prompts tab becomes **Agent Misuse**: *Bulk export*, *Unauthorised transfer* and *Profile harvest*. These are ordinary-sounding requests rather than jailbreaks — current models (gpt-oss, DeepSeek V3.2) refuse the obvious jailbreak presets on their own, but carry these out. That's the point of the scene: the prompt guardrail has nothing to catch, and only the gateway's access rules (and response guardrails) stop the agent. With MCP Tools off the six jailbreak presets are shown as before.
+
 ### Full-screen demo view
 
 Open `https://<your-app>/?view=demo`, or click the expand icon in the chat header. The chat fills the screen and a **Request trace** panel on the right shows each step of every request — prompt sent, AI Guard or AI Gateway decision, model reply, response shown — with the layer that decided and how long it took. **Vision One Events ↗** opens the gateway's Events page, which stays the system of record.

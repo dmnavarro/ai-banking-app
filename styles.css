@@ -754,6 +754,7 @@ nav ul li.active a, nav ul li a:hover { color: var(--navy); border-bottom-color:
 .preset-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 
 .preset-panel { display: none; }
+.preset-scroll[hidden] { display: none; }
 .preset-panel.active { display: flex; }
 
 .preset-chip {

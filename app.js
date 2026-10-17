@@ -1160,6 +1160,7 @@ function currentScenario() {
 }
 
 function updateDemoBar() {
+  updateThreatPresets();
   const bar = document.getElementById('demoBar');
   if (!bar) return;
   const active = currentScenario();
@@ -1191,6 +1192,16 @@ function updateDemoBar() {
     label.classList.toggle('inactive', !isGatewayOn());
     document.getElementById('identityHint').textContent = isGatewayOn() ? '' : 'gateway only';
   }
+}
+
+// With MCP tools on, the threat tab swaps jailbreak presets for agent-misuse requests
+function updateThreatPresets() {
+  const agent = isToolsOn();
+  const tab = document.getElementById('tabThreat');
+  document.getElementById('threatChat').hidden  = agent;
+  document.getElementById('threatAgent').hidden = !agent;
+  tab.dataset.i18n = agent ? 'chat.agentMisuse' : 'chat.maliciousPrompts';
+  tab.textContent  = t(tab.dataset.i18n);
 }
 
 function toggleTools() {
