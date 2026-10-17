@@ -1357,6 +1357,41 @@ function renderGatewayPage() {
   tag.textContent = on ? t('gw.on') : serverGateway.configured ? t('gw.off') : t('gw.notConfigured');
 }
 
+// ── Preflight (M7): /api/gateway/health runs every check for real ──
+async function runPreflight() {
+  const btn = document.getElementById('pfRun');
+  const status = document.getElementById('pfStatus');
+  const list = document.getElementById('pfList');
+  btn.disabled = true;
+  status.className = 'tag'; status.textContent = t('pf.running');
+  list.innerHTML = '';
+  try {
+    const r = await fetch('/api/gateway/health');
+    const data = await r.json();
+    status.className = 'tag ' + (data.ok ? 'ok' : 'bad');
+    status.textContent = data.ok ? t('pf.ready') : t('pf.notReady');
+    list.innerHTML = data.checks.map(c => `<li class="${c.ok ? 'ok' : 'bad'}">
+        <span class="pf-mark">${c.ok ? '✓' : '✕'}</span>
+        <div><b>${escHtml(c.label)}</b><span>${escHtml(c.detail || '')}</span></div>
+        <span class="muted small">${c.ms != null ? (c.ms / 1000).toFixed(1) + ' s' : ''}</span>
+      </li>`).join('');
+  } catch (e) {
+    status.className = 'tag bad'; status.textContent = t('pf.notReady');
+    list.innerHTML = `<li class="bad"><span class="pf-mark">✕</span><div><b>${escHtml(t('pf.unreachable'))}</b><span>${escHtml(e.message)}</span></div></li>`;
+  }
+  btn.disabled = false;
+}
+
+// ── AI Scanner before/after (M7): the same app scanned direct, then through the gateway ──
+function setScanTarget(kind) {
+  const gw = kind === 'gateway';
+  setEndpointFormat('custom');
+  document.getElementById('scTargetUrl').value = `${location.origin}/api/chat${gw ? '/gateway' : ''}`;
+  document.getElementById('scTargetLabel').value = gw ? 'DG Bank Chatbot via AI Gateway' : 'DG Bank Chatbot (direct)';
+  document.getElementById('scPresetDirect').classList.toggle('active', !gw);
+  document.getElementById('scPresetGateway').classList.toggle('active', gw);
+}
+
 // ── Offers ──
 const OFFERS = [
   { tone: 'crimson', title: 'offers.trial', tag: 'offers.freeTrial', action: () => window.open('https://www.trendaisecurity.com/en/platform/free-trial', '_blank', 'noopener') },
@@ -1520,6 +1555,8 @@ function closeScannerPage() { showView('home'); }
 
 // Called by showView('scanner')
 function prepareScanner() {
+  const region = localStorage.getItem('visionone_region') || 'sg';
+  document.getElementById('scV1Link').href = `https://${PORTAL_HOSTS[region] || PORTAL_HOSTS.sg}/#/app/ai-app-sec?path=%2Fscanner`;
   const apiKey = localStorage.getItem('visionone_api_key');
   const demo   = localStorage.getItem('visionone_demo') === 'true';
   setScannerMode((demo || (!apiKey && !serverHasDefaultKey)) ? 'demo' : 'live');

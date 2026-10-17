@@ -11,6 +11,17 @@ const app = express();
 app.use(express.json({ limit: '15mb' })); // SDK mode sends files as base64 (~33% overhead over 10MB limit)
 app.use(express.static(__dirname));
 
+// /api/chat/gateway = /api/chat forced through the AI Gateway (as c3po-assistant, no tools).
+// The AI Scanner targets it for the "after" scan; /api/chat (direct route) is the "before".
+app.use((req, _res, next) => {
+  if (req.method === 'POST' && req.path === '/api/chat/gateway') {
+    req.url = '/api/chat';
+    req.body = { ...(req.body || {}), route: 'gateway', identity: 'assistant', tools: false };
+    req.scanTarget = true;
+  }
+  next();
+});
+
 const BEDROCK_MODEL_ID  = process.env.BEDROCK_MODEL_ID || 'us.deepseek.r1-v1:0';
 const BEDROCK_REGION    = process.env.BEDROCK_REGION   || 'us-east-1';
 const FILESCAN_BUCKET   = (process.env.FILESCAN_BUCKET || '').trim();
@@ -410,8 +421,10 @@ app.post('/api/chat', async (req, res) => {
         // Logged in full so the denial format can be mapped to the block card (M3).
         console.log(`[Gateway] error body: ${JSON.stringify(r.data).slice(0, 1000)}`);
         const err = r.data?.error || {};
+        // AI Scanner (TMAS) only reads {reply}: hand it the block as the answer so it scores a refusal
+        const blockedReply = req.scanTarget ? { reply: `Blocked by the AI Gateway: ${err.message || `HTTP ${r.status}`}` } : {};
         return res.json({
-          route: 'gateway', identity,
+          route: 'gateway', identity, ...blockedReply,
           gatewayError: {
             status:  r.status,
             type:    err.type || null,
@@ -876,6 +889,83 @@ app.post('/api/bills/fetch-url', async (req, res) => {
 
 // Health check — fast response for ALB
 app.get('/health', (_req, res) => res.json({ ok: true }));
+
+// Preflight: is everything the demo needs actually working? Each check runs for real (a model
+// call per identity, a card number that the guardrails must deny, tools/list on both routes),
+// so a gateway that silently fails open shows red here before an audience sees it.
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(`timed out after ${ms / 1000}s`)), ms))]);
+
+async function preflightCheck(id, label, fn) {
+  const t0 = Date.now();
+  try {
+    const detail = await withTimeout(fn(), 30000);
+    return { id, label, ok: true, detail, ms: Date.now() - t0 };
+  } catch (e) {
+    return { id, label, ok: false, detail: e.message || String(e), ms: Date.now() - t0 };
+  }
+}
+
+async function countTools(url, bearer) {
+  const client = await connectMcp(url, bearer);
+  try { return ((await client.listTools()).tools || []).length; }
+  finally { await client.close().catch(() => {}); }
+}
+
+app.get('/api/gateway/health', async (_req, res) => {
+  const ping = [{ role: 'user', content: 'Reply with the single word OK.' }];
+  const EXPECTED_TOOLS = 6;
+  const checks = [];
+
+  if (!GATEWAY_BASE_URL) {
+    checks.push({ id: 'gateway', label: 'AI Gateway configured', ok: false, detail: 'GATEWAY_BASE_URL is not set (deploy-ecs.sh --gateway-url)' });
+  } else {
+    for (const [identity, key] of Object.entries(GATEWAY_KEYS)) {
+      checks.push(preflightCheck(`key-${identity}`, `Gateway answers as ${identity === 'ops' ? 'ops-analyst-agent' : 'c3po-assistant'}`, async () => {
+        if (!key) throw new Error('virtual key not set');
+        const r = await openAiChat(GATEWAY_BASE_URL, key, GATEWAY_MODEL, ping, null, 'auto', 25000);
+        if (!r.ok) throw new Error(r.data?.error?.message || `HTTP ${r.status}`);
+        return `model ${r.data?.model || GATEWAY_MODEL}`;
+      }));
+    }
+    // A guardrail that cannot scan lets everything through and only logs a WARN in the gateway pod.
+    // The standard Visa test number must be denied; if it is allowed, the guardrails are not enforcing.
+    checks.push(preflightCheck('guardrails', 'Guardrails enforcing (test card number is denied)', async () => {
+      const r = await openAiChat(GATEWAY_BASE_URL, GATEWAY_KEYS.assistant, GATEWAY_MODEL,
+        [{ role: 'user', content: 'Preflight check: my card 4111 1111 1111 1111 was charged twice.' }], null, 'auto', 25000);
+      if (r.ok) throw new Error('allowed — guardrails are not scanning (check the gateway pods: all three scanners loaded?)');
+      const msg = r.data?.error?.message || '';
+      if (!/content policy/i.test(msg)) throw new Error(`failed for another reason: ${msg || `HTTP ${r.status}`}`);
+      return `denied by content policy (HTTP ${r.status})`;
+    }));
+    if (GATEWAY_MCP_URL) {
+      checks.push(preflightCheck('mcp-gateway', `MCP tools through the gateway (${EXPECTED_TOOLS})`, async () => {
+        const n = await countTools(GATEWAY_MCP_URL, GATEWAY_KEYS.assistant);
+        if (n !== EXPECTED_TOOLS) throw new Error(`${n} tools listed, expected ${EXPECTED_TOOLS}`);
+        return `${n} tools`;
+      }));
+    }
+  }
+  if (MCP_DIRECT_URL) {
+    checks.push(preflightCheck('mcp-direct', `MCP tools direct (${EXPECTED_TOOLS})`, async () => {
+      const n = await countTools(MCP_DIRECT_URL, MCP_TOKEN);
+      if (n !== EXPECTED_TOOLS) throw new Error(`${n} tools listed, expected ${EXPECTED_TOOLS}`);
+      return `${n} tools`;
+    }));
+  }
+  if (hasDirectLlm()) {
+    checks.push(preflightCheck('direct-model', 'Direct model answers (Tests 1–3)', async () => {
+      const r = await openAiChat(DIRECT_LLM_BASE_URL, DIRECT_LLM_API_KEY, DIRECT_LLM_MODEL, ping, null, 'auto', 25000);
+      if (!r.ok) throw new Error(r.data?.error?.message || `HTTP ${r.status}`);
+      return DIRECT_LLM_MODEL;
+    }));
+  }
+  checks.push({ id: 'aiguard', label: 'AI Guard key on the server (Test 2)', ok: !!(process.env.TMAS_API_KEY || '').trim(),
+                detail: (process.env.TMAS_API_KEY || '').trim() ? 'configured' : 'TMAS_API_KEY not set' });
+
+  const results = await Promise.all(checks);
+  console.log(`[Preflight] ${results.map(c => `${c.id}:${c.ok ? 'ok' : 'FAIL'}`).join(' ')}`);
+  res.json({ ok: results.every(c => c.ok), at: new Date().toISOString(), checks: results });
+});
 
 // Serve the app at root
 app.get('/', (_req, res) => {

@@ -14,6 +14,7 @@ Built for Sales Engineers to deploy in their own AWS account and use during cust
 - [Prerequisites](#prerequisites)
 - [Full deployment walkthrough](#full-deployment-walkthrough)
 - [AI Gateway cluster (private preview)](#ai-gateway-cluster-private-preview)
+- [Demo runbook](#demo-runbook)
 - [Using the app](#using-the-app)
   - [AI Guard](#ai-guard)
   - [AI Scanner](#ai-scanner)
@@ -505,6 +506,52 @@ Removes the load balancer, the gateway release and its Redis volume, both contro
 
 ---
 
+## Demo runbook
+
+### Before every demo (5 minutes)
+
+1. **AI Gateway → Preflight → Run preflight.** Every row must be ✓. The checks call the gateway as each virtual key, send the test card `4111 1111 1111 1111` (it must be **denied** — if it comes back *allowed*, guardrails are not scanning; on `c7i` nodes the sensitive-data scanner fails, use `t3.xlarge`), and list the six MCP tools through the gateway and direct. The same result is at `GET /api/gateway/health`.
+2. Open **Vision One → AI Gateway → Events** in a second tab, and the **AI Scanner** page in Vision One (the **Vision One ↗** link on the app's AI Scanner page opens it for the region in Settings).
+3. Open `https://<your-app>/?view=demo` and press **Test 1**.
+
+### 15-minute flow
+
+| # | Where | Do | Say |
+|---|---|---|---|
+| 1 | Test 1 | Banking Queries → *Account balance* | C-3PO knows Theo's account; nothing sits between the app and the model |
+| 2 | Test 1 | Prompt Injection → any preset | The model alone is the only defence |
+| 3 | Test 2 | Same injection | AI Guard (in the app) blocks it — one app protected by code |
+| 4 | Test 4 | Same injection, then *Card dispute* | The gateway blocks it with no app change; the card number is a PII block. Show the event in Vision One |
+| 5 | Test 3 → Test 4 | Agent Misuse → *Bulk export* | Direct, the tool runs and a CSV downloads. Through the gateway, the access rule forbids `export_customer_records` for `c3po-assistant` |
+
+### 30-minute flow
+
+The 15-minute flow, then:
+
+| # | Where | Do | Say |
+|---|---|---|---|
+| 6 | Test 4, Chat as `ops-analyst-agent` | *Bulk export* again | Same tool, different identity, different rule |
+| 7 | Test 3 → Test 4 | *Threat in memo*, *Profile harvest* | Guardrails also scan tool arguments and tool results (M6) |
+| 8 | AI Gateway page | Walk the five use cases on the diagram | One policy point for chatbots, agents and laptop agents |
+| 9 | AI Scanner (Live) | **DG Bank app (direct)** → scan; then **Via AI Gateway** → same attacks | Before/after: the same app, red-teamed with and without the gateway. Open the results in Vision One |
+
+The two scanner targets are `https://<your-app>/api/chat` (the model with only its system prompt) and `https://<your-app>/api/chat/gateway` (the same chatbot as `c3po-assistant` through the gateway, no tools). A gateway block reaches the scanner as the reply `Blocked by the AI Gateway: …`, so it scores as a refusal. A live scan takes several minutes: start the direct scan before the talk track, or show a saved result.
+
+### Reset between demos
+
+- **Clear** in the demo view (optional — history already resets when the Test changes).
+- **Log out** clears the session; reload the page.
+- If you changed the guardrail policy, restart the gateway: `kubectl -n trendai-gateway rollout restart deploy/trendai-gateway-gateway`.
+- Run **Preflight** again.
+
+### If something is down
+
+- Preflight ✕ on a key or the model: check **Models** and **Identities** in the console; Groq rate limits show as HTTP 429 — routing should fail over to Bedrock.
+- Gateway unreachable: the app falls back to Tests 1–3, which need no gateway. Tell the gateway story on the AI Gateway page diagram and in the Vision One Events tab.
+- Keep screenshots of Test 4 blocks, the access-rule block and a finished scanner comparison as a fallback.
+
+---
+
 ## Using the app
 
 ### AI Guard
@@ -555,6 +602,8 @@ Removes the load balancer, the gateway release and its Redis volume, both contro
 5. When complete, a per-objective scorecard shows blocked vs. passed techniques. Click **Export** to download the full scan log.
 
 > Live mode activates automatically when `TMAS_API_KEY` is configured on the server — no manual key entry needed after deployment.
+
+**Before/after:** under the endpoint field, **DG Bank app (direct)** and **Via AI Gateway** fill in this app's `/api/chat` and `/api/chat/gateway`. Scan both with the same attacks to show what the gateway adds. **Vision One ↗** (top right) opens the AI Scanner in the Vision One console for the region in Settings.
 
 **Self-hosted judge:** **Settings** → Self-hosted Endpoints → enter your judge endpoint URL. When set, TMAS routes the scan through your judge instead of the Trend-hosted service. Leave blank to use the Trend-hosted service.
 

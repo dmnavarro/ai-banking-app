@@ -1910,3 +1910,17 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 #uc4:checked ~ .tabs label[for=uc4]{background:#9E1B2E;color:#fff;border-color:#9E1B2E}#uc4:focus-visible ~ .tabs label[for=uc4]{outline:2px solid #1C1012;outline-offset:2px}#uc4:checked ~ .stage .u4{display:inline}#uc4:checked ~ .desc .d4{display:block}
 #uc5:checked ~ .tabs label[for=uc5]{background:#9E1B2E;color:#fff;border-color:#9E1B2E}#uc5:focus-visible ~ .tabs label[for=uc5]{outline:2px solid #1C1012;outline-offset:2px}#uc5:checked ~ .stage .u5{display:inline}#uc5:checked ~ .desc .d5{display:block}
 .gwr .tabs label { user-select: none; }
+
+/* M7: preflight on the AI Gateway page; scanner before/after targets and Vision One link */
+.preflight { margin-top: 1.25rem; }
+.preflight .btn-primary { margin: .3rem 0 .8rem; }
+.pf-list { list-style: none; }
+.pf-list li { display: flex; align-items: center; gap: .8rem; padding: .7rem 0; border-top: 1px solid #F3E9E7; }
+.pf-list li div { flex: 1; display: flex; flex-direction: column; }
+.pf-list li div span { font-size: .82rem; color: #7A5F63; }
+.pf-mark { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; flex-shrink: 0; }
+.pf-list li.ok .pf-mark { background: var(--ok-bg); color: var(--ok-fg); }
+.pf-list li.bad .pf-mark { background: var(--bad-bg); color: var(--bad-fg); }
+.sc-target-presets { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .5rem; font-size: .8rem; color: var(--steel); }
+.sc-v1-link { margin-left: .75rem; font-size: .82rem; font-weight: 700; color: var(--blue); text-decoration: none; white-space: nowrap; }
+.sc-v1-link:hover { text-decoration: underline; }

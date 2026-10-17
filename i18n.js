@@ -7,6 +7,11 @@ let currentLang = localStorage.getItem('lang') || 'en';
 
 const I18N = {
   en: {
+    'pf.title': 'Preflight', 'pf.notRun': 'Not run', 'pf.run': 'Run preflight', 'pf.running': 'Running…',
+    'pf.ready': 'Ready to demo', 'pf.notReady': 'Not ready', 'pf.unreachable': 'Preflight endpoint unreachable',
+    'pf.body': 'Run this before every demo. It calls the gateway as each identity, checks that a test card number is denied, and lists the MCP tools on both routes.',
+    'scanner.openV1': 'Vision One', 'scanner.beforeAfter': 'Before / after:',
+    'scanner.presetDirect': 'DG Bank app (direct)', 'scanner.presetGateway': 'Via AI Gateway',
     // ── Redesign: navigation, pages ──
     'sb.home': 'Home', 'sb.assistant': 'Chatbot Assistant', 'sb.aiSecurity': 'AI Security', 'sb.scanner': 'AI Scanner',
     'sb.gateway': 'AI Gateway', 'sb.settings': 'Settings', 'sb.cloudSecurity': 'Cloud Security', 'sb.fileSecurity': 'File Security',
