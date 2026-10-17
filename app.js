@@ -1522,11 +1522,6 @@ function renderCloudPages() {
 }
 
 renderDashboardTexts();
-if (new URLSearchParams(location.search).get('view') === 'demo') {
-  toggleDemoView(true);
-} else {
-  showView(location.hash.slice(1) || 'home');
-}
 
 // Init guard pill on load
 updateGuardPill();
@@ -2452,4 +2447,12 @@ function exportReport() {
   a.download = `ai-scanner-report-${Date.now()}.txt`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// Open the page in the URL last, once every page's state (let/const above) exists:
+// routing earlier made a reload on #files or #scanner throw and leave its controls dead.
+if (new URLSearchParams(location.search).get('view') === 'demo') {
+  toggleDemoView(true);
+} else {
+  showView(location.hash.slice(1) || 'home');
 }
