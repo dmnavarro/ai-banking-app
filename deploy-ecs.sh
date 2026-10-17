@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ---------------------------------------------------------------------------
 # DG Bank — ECS on EC2 deploy script
-# Usage: ./deploy-ecs.sh --github-org <org> [options]
+# Usage: ./deploy-ecs.sh [--github-org <org>] [options]   (--github-org is needed for the first deploy)
 #
 # What this script does (in order):
 #   1. Create ECR repo if it doesn't exist
@@ -16,10 +16,11 @@ set -euo pipefail
 STACK_NAME="dgbank-ai-app-demo-ecs"
 ECR_REPO="dgbank-ai-app-demo"
 REGION="ap-southeast-1"
-INSTANCE_TYPE="t3.small"
-BEDROCK_REGION="us-east-1"
-BEDROCK_MODEL_ID="us.deepseek.r1-v1:0"
-CREATE_OIDC="true"
+# Left empty here: an existing stack keeps its values, a new one gets the defaults (below)
+INSTANCE_TYPE=""
+BEDROCK_REGION=""
+BEDROCK_MODEL_ID=""
+CREATE_OIDC=""
 GITHUB_ORG=""
 GITHUB_REPO="ai-banking-app"
 CERTIFICATE_ARN=""
@@ -31,10 +32,10 @@ GATEWAY_MCP_URL=""
 
 usage() {
   cat <<EOF
-Usage: $0 --github-org <org> [options]
+Usage: $0 [--github-org <org>] [options]
 
 Required:
-  --github-org       GitHub username or organization name
+  --github-org       GitHub username or organization (first deploy; later runs keep the stack's value)
 
 Optional:
   --github-repo      GitHub repository name (default: ai-banking-app)
@@ -76,8 +77,26 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# On an existing stack, every setting not given on the command line keeps its current value.
+# Re-sending a default instead can ask CloudFormation for something that already exists (e.g.
+# the GitHub OIDC provider after --skip-oidc), which fails the update before it starts.
+stack_param() {
+  aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" \
+    --query "Stacks[0].Parameters[?ParameterKey=='$1'].ParameterValue" --output text 2>/dev/null \
+    | grep -v '^None$' || true
+}
+: "${GITHUB_ORG:=$(stack_param GitHubOrg)}"
+: "${INSTANCE_TYPE:=$(stack_param InstanceType)}"
+: "${BEDROCK_REGION:=$(stack_param BedrockRegion)}"
+: "${BEDROCK_MODEL_ID:=$(stack_param BedrockModelId)}"
+: "${CREATE_OIDC:=$(stack_param CreateOIDCProvider)}"
+: "${INSTANCE_TYPE:=t3.small}"
+: "${BEDROCK_REGION:=us-east-1}"
+: "${BEDROCK_MODEL_ID:=us.deepseek.r1-v1:0}"
+: "${CREATE_OIDC:=true}"
+
 if [[ -z "$GITHUB_ORG" ]]; then
-  echo "Error: --github-org is required"
+  echo "Error: --github-org is required for a new stack"
   usage
 fi
 

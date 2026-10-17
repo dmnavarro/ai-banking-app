@@ -609,7 +609,7 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | `--direct-llm-model` | *(unchanged)* | Model for `--direct-llm-url`, e.g. `openai/gpt-oss-120b` |
 | `--mcp-url` | *(unchanged)* | DG Bank MCP server URL for tools without the gateway; needs SSM `/dgbank/mcp-token` |
 | `--gateway-mcp-url` | *(unchanged)* | AI Gateway MCP Connect URL for the `dgbank-mcp` upstream |
-| `--skip-oidc` | *(off)* | Skip OIDC provider creation on re-runs |
+| `--skip-oidc` | *(off)* | Skip OIDC provider creation when it already exists. Re-runs keep the stack's setting, as they do for every option left out |
 | `--stack-name` | `dgbank-ai-app-demo-ecs` | CloudFormation stack name |
 
 ### `deploy-filesecurity.sh`
