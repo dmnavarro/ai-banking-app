@@ -3,154 +3,71 @@
 })();
 
 
-// ── SPARKLINE ──
-(function() {
-  const canvas = document.getElementById('sparkCanvas');
-  const parent = canvas.parentElement;
-  const dpr = window.devicePixelRatio || 1;
-  function draw() {
-    const W = parent.offsetWidth;
-    const H = 80;
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-    const pts = [38000,41000,39500,43000,40000,44500,42000,46000,43500,48000,45000,50000,47000,52000,49000,53500,51000,55000,52000,57000,54000,58500,56000,60000,58000,62500,60000,64000,62000,84219];
-    const min = Math.min(...pts) - 2000;
-    const max = Math.max(...pts) + 1000;
-    const scaleY = v => H - 8 - ((v - min) / (max - min)) * (H - 16);
-    const scaleX = i => (i / (pts.length - 1)) * W;
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, 'rgba(220,80,100,.38)');
-    grad.addColorStop(1, 'rgba(220,80,100,0)');
-    ctx.beginPath();
-    ctx.moveTo(scaleX(0), scaleY(pts[0]));
-    for (let i = 1; i < pts.length; i++) {
-      const cpx = (scaleX(i-1)+scaleX(i))/2;
-      ctx.bezierCurveTo(cpx, scaleY(pts[i-1]), cpx, scaleY(pts[i]), scaleX(i), scaleY(pts[i]));
-    }
-    ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
-    ctx.fillStyle = grad; ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(scaleX(0), scaleY(pts[0]));
-    for (let i = 1; i < pts.length; i++) {
-      const cpx = (scaleX(i-1)+scaleX(i))/2;
-      ctx.bezierCurveTo(cpx, scaleY(pts[i-1]), cpx, scaleY(pts[i]), scaleX(i), scaleY(pts[i]));
-    }
-    ctx.strokeStyle = 'rgba(240,120,135,.85)'; ctx.lineWidth = 2; ctx.stroke();
-    const ex = scaleX(pts.length-1), ey = scaleY(pts[pts.length-1]);
-    ctx.beginPath(); ctx.arc(ex, ey, 4, 0, Math.PI*2);
-    ctx.fillStyle = '#fff'; ctx.fill();
-    ctx.strokeStyle = '#4EEAA0'; ctx.lineWidth = 2; ctx.stroke();
-  }
-  draw();
-  window.addEventListener('resize', draw);
-})();
+// ── THEO'S ACCOUNT ──
+// One Savings account, the same figures the DG Bank MCP tools return (mcp/data.js), so the
+// assistant's answers always match the screen. Labels are re-resolved on every language switch.
+const ACCOUNT = {
+  holder:  'Theo Santos',
+  number:  '•••• 7610',
+  balance: 14203.18,
+  rate:    '2.10% p.a.',
+  card:    'DG Visa Debit •••• 7842',
+};
+const TRANSACTIONS = [
+  { date: '2026-10-17', name: 'Grocery Mart',    amount:   -64.20, cat: 'cat.groceries', icon: 'bag',     tone: 'rose'   },
+  { date: '2026-10-16', name: 'Utility bill',    amount:   -86.40, cat: 'cat.bills',     icon: 'receipt', tone: 'indigo' },
+  { date: '2026-10-15', name: 'Salary deposit',  amount:  2400.00, cat: 'cat.income',    icon: 'in',      tone: 'mint'   },
+  { date: '2026-10-12', name: 'Coffee shop',     amount:    -5.40, cat: 'cat.dining',    icon: 'card',    tone: 'sand'   },
+  { date: '2026-10-11', name: 'Grab',            amount:   -18.40, cat: 'cat.transport', icon: 'card',    tone: 'sand'   },
+  { date: '2026-10-10', name: 'Interest credit', amount:    24.85, cat: 'cat.banking',   icon: 'in',      tone: 'mint'   },
+];
+const TXN_ICONS = {
+  bag:     '<path d="M6 8h12l-1 12H7z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+  in:      '<path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 20h14"/>',
+  card:    '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/>',
+};
 
-// Snapshot of this session's dashboard data (balance, transactions, etc.) — populated by
-// initSessionData() below and sent with every /api/chat call so C-3PO can reference real figures.
+const money = n => `${n < 0 ? '−' : '+'}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+const BALANCE_TEXT = `$${ACCOUNT.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+
+// Sent with every /api/chat call so C-3PO can reference the account on screen
 let ACCOUNT_CONTEXT = null;
 
-// ── SESSION DATA RANDOMISATION ──
-// Numbers/picks are randomized once per session and never re-rolled. Language-dependent
-// LABELS (greeting, category names) are re-resolved by renderDashboardTexts() on every
-// language switch so the displayed figures never change, only the words around them.
-let SESSION_DATA = null;
+function txnDateLabel(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return t('date.today');
+  return d.toLocaleDateString(LOCALE_TAGS[currentLang] || 'en-US', { month: 'short', day: 'numeric' });
+}
 
-(function initSessionData() {
-  const r = (min, max) => min + Math.random() * (max - min);
-  const fmt = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  // Balance: $76k – $106k
-  const balance   = r(76000, 106000);
-  const monthGain = r(800, 3200);
-  const pct       = ((monthGain / (balance - monthGain)) * 100).toFixed(2);
-  const pending   = r(120, 680);
-  const dollars   = Math.floor(balance);
-  const cents     = Math.round((balance - dollars) * 100).toString().padStart(2, '0');
-  const el = document.getElementById('balAmount');
-  if (el) el.innerHTML = `<sup>$</sup>${dollars.toLocaleString('en-US')}<span style="font-size:1.8rem">.${cents}</span>`;
-  const mg = document.getElementById('balMonthGain');
-  if (mg) mg.textContent = `▲ +$${fmt(monthGain)}`;
-  const vl = document.getElementById('balVsLastMonth');
-  if (vl) vl.textContent = `+${pct}%`;
-  const pd = document.getElementById('balPending');
-  if (pd) pd.textContent = `−$${fmt(pending)}`;
-
-  // Transactions — pool of 10, pick 7 at random with ±8% amount jitter
-  const pool = [
-    { icon:'🛒', bg:'#FFF0F0', name:'Whole Foods Market',   type:'db', base:87.34,   cat:'cat.groceries'     },
-    { icon:'💼', bg:'#F0FFF8', name:'Acme Corp Payroll',    type:'cr', base:4250.00,  cat:'cat.income'        },
-    { icon:'☕', bg:'#F0F4FF', name:'Blue Bottle Coffee',   type:'db', base:6.75,    cat:'cat.dining'        },
-    { icon:'🎬', bg:'#FFF7ED', name:'Netflix',              type:'db', base:15.49,   cat:'cat.entertainment' },
-    { icon:'🏋️', bg:'#F5F0FF', name:'Equinox Fitness',     type:'db', base:190.00,  cat:'cat.health'        },
-    { icon:'⛽', bg:'#FFFBF0', name:'Shell Gas Station',    type:'db', base:62.80,   cat:'cat.transport'     },
-    { icon:'🏦', bg:'#F0FFF8', name:'Interest Credit',      type:'cr', base:42.18,   cat:'cat.banking'       },
-    { icon:'🍜', bg:'#FFF0F5', name:'Shake Shack',          type:'db', base:24.60,   cat:'cat.dining'        },
-    { icon:'🛍️', bg:'#F0F0FF', name:'Amazon',              type:'db', base:134.99,  cat:'cat.shopping'      },
-    { icon:'✈️', bg:'#F0F8FF', name:'Singapore Airlines',  type:'db', base:890.00,  cat:'cat.travel'        },
-  ];
-  const shuffled = pool.slice().sort(() => Math.random() - 0.5).slice(0, 7);
-  const now2 = new Date();
-  const txnRaw = shuffled.map((item, i) => {
-    const amt  = item.base * r(0.92, 1.08);
-    const sign = item.type === 'cr' ? '+' : '−';
-    const dateObj = new Date(now2);
-    if (i >= 2) dateObj.setDate(now2.getDate() - i);
-    return { ...item, dayIndex: i, amountNum: amt, sign, dateObj };
-  });
-
-  SESSION_DATA = {
-    balance: `$${dollars.toLocaleString('en-US')}.${cents}`,
-    monthChange: `+$${fmt(monthGain)} (+${pct}%)`,
-    pendingCharges: `−$${fmt(pending)}`,
-    hour: new Date().getHours(),
-    txnRaw,
-    fmt,
-  };
-  renderDashboardTexts();
-})();
+function txnRow(x) {
+  return `<li>
+    <span class="act-ic ${x.tone}"><svg viewBox="0 0 24 24">${TXN_ICONS[x.icon]}</svg></span>
+    <div class="act-info"><b>${x.name}</b><span>${t('acct.savings')} · ${txnDateLabel(x.date)}</span></div>
+    <span class="act-amt ${x.amount > 0 ? 'cr' : ''}">${money(x.amount)}</span>
+  </li>`;
+}
 
 function renderDashboardTexts() {
-  const sd = SESSION_DATA;
-  if (!sd) return;
-
-  const localeTag = LOCALE_TAGS[currentLang] || 'en-US';
-
-  // Greeting
-  const todKey = sd.hour < 12 ? 'greeting.morning' : sd.hour < 17 ? 'greeting.afternoon' : 'greeting.evening';
-  const now = new Date();
+  const hour = new Date().getHours();
+  const todKey = hour < 12 ? 'home.morning' : hour < 17 ? 'home.afternoon' : 'home.evening';
   const hdr = document.getElementById('greetingHdr');
-  if (hdr) hdr.textContent = t('greeting.header').replace('{tod}', t(todKey));
-  const dt = document.getElementById('greetingDate');
-  const longDate = now.toLocaleDateString(localeTag, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
-  if (dt) dt.textContent = `${longDate} · ${t('greeting.overview')}`;
+  if (hdr) hdr.textContent = t(todKey);
+  document.querySelectorAll('.balance-amt').forEach(el => { el.textContent = BALANCE_TEXT; });
 
-  // Transactions
-  const dateLabels = [t('date.today'), t('date.yesterday')];
-  const times = ['8:12 AM','9:00 AM','11:42 AM','2:15 PM','3:44 PM','6:30 AM','12:00 AM'];
-  const txnData = sd.txnRaw.map(item => {
-    const dateStr = item.dayIndex < 2 ? dateLabels[item.dayIndex] : item.dateObj.toLocaleDateString(localeTag, { month: 'short', day: 'numeric' });
-    return { ...item, date: `${dateStr}, ${times[item.dayIndex]}`, amount: `${item.sign}$${sd.fmt(item.amountNum)}`, catLabel: t(item.cat) };
-  });
-  const txnList = document.getElementById('txnList');
-  if (txnList) {
-    txnList.innerHTML = txnData.map(item => `<li class="txn-item">
-        <div class="txn-icon" style="background:${item.bg}">${item.icon}</div>
-        <div class="txn-info"><div class="txn-name">${item.name}</div><div class="txn-date">${item.date}</div></div>
-        <div><div class="txn-amount ${item.type}">${item.amount}</div><div class="txn-cat">${item.catLabel}</div></div>
-      </li>`).join('');
-  }
+  const home = document.getElementById('txnList');
+  if (home) home.innerHTML = TRANSACTIONS.slice(0, 3).map(txnRow).join('');
+  const all = document.getElementById('txnListAll');
+  if (all) all.innerHTML = TRANSACTIONS.map(txnRow).join('');
+  renderOffers();
+  renderCloudPages();
 
-  // Expose this session's real dashboard figures so the chatbot can reference them —
-  // single source of truth shared between the UI and whatever C-3PO tells the customer.
   ACCOUNT_CONTEXT = {
-    balance:        sd.balance,
-    monthChange:    sd.monthChange,
-    pendingCharges: sd.pendingCharges,
-    creditLine:     '$15,000.00',
-    card:           'Platinum Rewards Visa •••• 7842',
-    transactions:   txnData.map(item => ({ name: item.name, date: item.date, amount: item.amount, category: item.catLabel })),
+    holder:  ACCOUNT.holder,
+    balance: `${BALANCE_TEXT} (Savings ${ACCOUNT.number}, ${ACCOUNT.rate})`,
+    card:    ACCOUNT.card,
+    transactions: TRANSACTIONS.map(x => ({ name: x.name, date: x.date, amount: money(x.amount), category: t(x.cat) })),
   };
 }
 
@@ -184,29 +101,9 @@ const REGIONS = {
   ca: 'https://api.ca.xdr.trendmicro.com',
 };
 
-function openSettings() {
-  // Close chat window if open (the demo view keeps it on screen)
-  if (chatOpen && !isDemoView()) {
-    chatOpen = false;
-    document.getElementById('chatWindow').classList.add('hidden');
-  }
-  document.getElementById('settingsOverlay').classList.add('open');
-  document.getElementById('settingsDrawer').classList.add('open');
-  document.getElementById('settingsBtn').classList.add('active');
-  const teasers = document.getElementById('chatTeasers');
-  if (teasers) teasers.classList.add('hidden');
-  loadSettingsUI();
-}
-
-function closeSettings() {
-  document.getElementById('settingsOverlay').classList.remove('open');
-  document.getElementById('settingsDrawer').classList.remove('open');
-  document.getElementById('settingsBtn').classList.remove('active');
-  if (!chatOpen) {
-    const teasers = document.getElementById('chatTeasers');
-    if (teasers) teasers.classList.remove('hidden');
-  }
-}
+// Settings is a page now (it was a drawer); these names stay for existing callers
+function openSettings() { showView('settings'); }
+function closeSettings() { /* nothing to close */ }
 
 function loadSettingsUI() {
   const apiKey  = localStorage.getItem('visionone_api_key') || '';
@@ -264,7 +161,7 @@ function saveSettings() {
 
   refreshStatusCard();
   updateGuardPill();
-  closeSettings();
+  showToast(t('toast.settingsSaved'));
 
   addSystemMsg(apiKey || serverHasDefaultKey
     ? '⚙️ Settings saved. AI Guard is active — live scanning with demo fallback on connectivity issues.'
@@ -551,6 +448,8 @@ function toggleChat() {
     win.classList.add('hidden');
     if (teasers) teasers.classList.remove('hidden');
   }
+  document.body.classList.toggle('chat-open', chatOpen);
+  markNav(chatOpen && isMobile() ? 'assistant' : currentView);
 }
 
 function openChatToGuard() {
@@ -566,16 +465,16 @@ function switchTab(tab) {
 }
 
 const BANKING_REPLIES = {
-  'balance':       'Your current total portfolio balance is **$84,219.46**.\n\n• Checking: $14,469.00\n• Savings: $28,540.00\n• Investments: $41,209.46\n\nBalance is up 2.24% month-over-month. 📈',
-  'transaction':   'Your last 3 transactions:\n\n1. Whole Foods Market — −$87.34 (today)\n2. Acme Corp Payroll — +$4,250.00 (yesterday)\n3. Blue Bottle Coffee — −$6.75 (Jun 30)\n\nWould you like a full statement?',
-  'transfer':      'To send money, tap **Send Money** on your dashboard. You can transfer to any linked account or external contact.\n\nWould you like help adding a new payee?',
-  'interest':      'Current rates:\n\n• Savings Account: **4.20% APY**\n• Money Market: **4.55% APY**\n• 12-Month CD: **5.10% APY**\n\nRates are subject to change. Federally insured up to $250,000.',
-  'invest':        'Your investment portfolio is valued at **$41,209.46**, up 3.4% this month. 📈\n\nTop holdings:\n• US Equity Index — $22,400\n• Bonds ETF — $11,200\n• Tech Growth — $7,609\n\nWould you like to make a deposit or view performance?',
-  'card':          'Your **Platinum Rewards Visa** (···7842):\n\n• Credit limit: $15,000\n• Used: $2,740 (18%)\n• Available: $12,260\n\nOptions: freeze, replace, or manage rewards.',
-  'replace':       "I've submitted a replacement card request for your Platinum Rewards Visa (···7842). Your new card will arrive in 5–7 business days. Your current card remains active until the new one is activated.",
-  'credit':        'Your credit line is **$15,000** with **$12,260 available** (18% utilised).\n\nWould you like to request a credit limit increase or view your statement?',
-  'bill':          'To set up automatic bill pay, go to **Payments → Bill Pay → Add Payee**. You can schedule one-time or recurring payments and set reminders.\n\nWould you like me to walk you through it?',
-  'auto':          'Auto bill pay lets you schedule recurring payments. Go to **Payments → Bill Pay → Schedule** to set it up. You can choose the amount, frequency, and start date.',
+  'balance':       'Your **Savings** account (•••• 7610) has **$14,203.18** available.',
+  'transaction':   'Your last 3 transactions:\n\n1. Grocery Mart — −$64.20 (today)\n2. Utility bill — −$86.40 (Oct 16)\n3. Salary deposit — +$2,400.00 (Oct 15)\n\nWould you like a full statement?',
+  'transfer':      'To send money, open **Transfer** from the menu. You can transfer to any account or contact.\n\nWould you like help adding a new payee?',
+  'interest':      'Your Savings account earns **2.10% p.a.** Rates are subject to change.',
+  'invest':        "You don't have an investment account yet. I can help you open one, or you can keep building your Savings balance of **$14,203.18**.",
+  'card':          'Your **DG Visa Debit** (•••• 7842) is active and linked to your Savings account.\n\nOptions: freeze, replace, or set spending limits.',
+  'replace':       "I've submitted a replacement request for your DG Visa Debit (•••• 7842). Your new card will arrive in 5–7 business days. Your current card stays active until the new one is activated.",
+  'credit':        "You don't have a credit line with DG Bank yet. Your debit card draws from Savings, with **$14,203.18** available.",
+  'bill':          'To set up automatic bill pay, open **Transfer** and choose a recurring date. You can schedule one-time or recurring payments.\n\nWould you like me to walk you through it?',
+  'auto':          'Auto bill pay lets you schedule recurring payments from Savings. Open **Transfer** to set the amount, frequency and start date.',
 };
 
 function getBankingReply(text) {
@@ -585,9 +484,9 @@ function getBankingReply(text) {
   }
   const defaults = [
     "I can help with that! Let me look into your account details. Is there anything specific you'd like to focus on?",
-    "Great question. For full details, you can also visit **Accounts** in the top navigation. Can I help with anything else?",
+    "Great question. For full details, you can also open **Accounts** from the menu. Can I help with anything else?",
     "I'm checking your account information now. For security, some actions may require additional verification in the mobile app.",
-    "Thanks, Anakin. I've noted your request. Is there anything else I can assist you with today?",
+    "Thanks, Theo. I've noted your request. Is there anything else I can assist you with today?",
   ];
   return defaults[Math.floor(Math.random() * defaults.length)];
 }
@@ -926,6 +825,7 @@ function downloadExport(records) {
 // Tool steps into the trace. Through the gateway, a refused call is the gateway's decision.
 function traceTools(toolTrace, viaGateway) {
   for (const t of toolTrace || []) {
+    if (t.step === 'call') recordToolCall(t, viaGateway);
     if (t.step === 'list') {
       traceStep(viaGateway ? 'gateway' : 'tool', t.status === 'ok' ? 'info' : 'block',
         t.status === 'ok' ? 'Tools listed' : 'Tool list refused', t.detail);
@@ -1215,6 +1115,7 @@ function currentScenario() {
 }
 
 function updateDemoBar() {
+  syncAppChrome();
   updateThreatPresets();
   const bar = document.getElementById('demoBar');
   if (!bar) return;
@@ -1366,6 +1267,7 @@ function toggleDemoView(force) {
   const url = new URL(location.href);
   if (on) url.searchParams.set('view', 'demo'); else url.searchParams.delete('view');
   history.replaceState(null, '', url);
+  markNav(on ? 'assistant' : currentView);
   updateDemoBar();
   renderTrace();
   document.getElementById('chatInput').focus();
@@ -1383,8 +1285,202 @@ function clearConversation() {
   renderTrace();
 }
 
+// ── NAVIGATION ──
+// The sidebar (desktop) and tab bar (mobile) switch between views in <main>. AI Scanner and
+// File Security are full pages of their own; "Chatbot Assistant" opens the full-screen demo
+// view on desktop and the chat window on a phone.
+const PAGE_VIEWS = { scanner: 'scannerPage', files: 'payBillsPage' };
+var currentView = 'home';   // var: read by syncAppChrome(), which can run before this line
+
+function isMobile() { return window.matchMedia('(max-width: 768px)').matches; }
+
+function markNav(name) {
+  document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === name));
+}
+
+function showView(name) {
+  if (name === 'assistant') {
+    if (isMobile()) { if (!chatOpen) toggleChat(); markNav('assistant'); }
+    else toggleDemoView(true);
+    return;
+  }
+  if (!PAGE_VIEWS[name] && !document.querySelector(`.view[data-view="${name}"]`)) name = 'home';
+  if (isDemoView()) toggleDemoView(false);
+  if (chatOpen) toggleChat();   // a new page closes the floating chat, as the old pages did
+
+  const leaving = currentView;
+  document.getElementById('scannerPage').classList.toggle('open', name === 'scanner');
+  document.getElementById('payBillsPage').classList.toggle('open', name === 'files');
+  document.querySelectorAll('.view').forEach(v => { v.hidden = v.dataset.view !== name; });
+  if (leaving === 'files' && name !== 'files' && pbPollTimer) { clearInterval(pbPollTimer); pbPollTimer = null; }
+
+  if (name === 'scanner') prepareScanner();
+  if (name === 'files' && leaving !== 'files') resetPbState();
+  if (name === 'settings') { loadSettingsUI(); syncAppChrome(); }
+  if (name === 'gateway') renderGatewayPage();
+
+  currentView = name;
+  markNav(name);
+  const url = new URL(location.href);
+  url.hash = name === 'home' ? '' : name;
+  history.replaceState(null, '', url);
+  window.scrollTo(0, 0);
+}
+
+// Start over for the next audience: this tab's chat, toggles and identity reset; saved
+// Vision One settings (API key, region) stay.
+function logOut() {
+  sessionStorage.clear();
+  location.href = location.pathname;
+}
+
+function submitTransfer(form) {
+  const amount = Number(form.amount.value || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+  showToast(t('xfer.done').replace('{amount}', `$${amount}`).replace('{to}', form.to.value));
+  form.reset();
+}
+
+// ── Routing switches (Settings page) mirror the chat pills and the demo bar ──
+function setRouting(kind, on) {
+  if (kind === 'guard'   && on !== isGuardOn())   toggleGuard();
+  if (kind === 'gateway' && on !== isGatewayOn()) toggleGateway();
+  if (kind === 'tools'   && on !== isToolsOn())   toggleTools();
+  syncAppChrome();
+}
+
+// Everything outside the chat that reflects the protection state; called from updateDemoBar()
+function syncAppChrome() {
+  const hasKey = serverHasDefaultKey || !!localStorage.getItem('visionone_api_key');
+  const sw = (id, checked, enabled) => {
+    const el = document.getElementById(id);
+    if (el) { el.checked = checked; el.disabled = !enabled || scanning; }
+  };
+  sw('setGuard',   isGuardOn(),   hasKey);
+  sw('setGateway', isGatewayOn(), serverGateway.configured);
+  sw('setTools',   isToolsOn(),   toolsAvailable());
+  const gwUrl = document.getElementById('setGwUrl');
+  if (gwUrl) gwUrl.value = serverGateway.configured ? serverGateway.host : 'Not configured';
+
+  const dot = (id, on) => { const el = document.getElementById(id); if (el) el.classList.toggle('on', on); };
+  dot('dotGuard', hasKey);
+  dot('dotGateway', !!serverGateway.configured);
+  if (currentView === 'gateway') renderGatewayPage();
+}
+
+// ── AI Gateway page ──
+const toolCalls = [];   // this session's tool calls, newest first
+function recordToolCall(call, viaGateway) {
+  toolCalls.unshift({ tool: String(call.tool).replace(/^.*__/, ''), status: call.status, viaGateway });
+  if (toolCalls.length > 6) toolCalls.pop();
+  if (currentView === 'gateway') renderGatewayPage();
+}
+
+function renderGatewayPage() {
+  const on = isGatewayOn();
+  const tag = document.getElementById('gwStateTag');
+  if (tag) {
+    tag.className = 'tag ' + (on ? 'ok' : serverGateway.configured ? '' : 'warn');
+    tag.textContent = on ? t('gw.on') : serverGateway.configured ? t('gw.off') : t('gw.notConfigured');
+  }
+  const route = document.getElementById('gwRouteLine');
+  if (route) route.textContent = [
+    on ? t('gw.routeGwOn') : t('gw.routeGwOff'),
+    isGuardOn() ? t('gw.routeGuardOn') : t('gw.routeGuardOff'),
+    isToolsOn() ? t('gw.routeToolsOn') : t('gw.routeToolsOff'),
+  ].join(', ');
+  const list = document.getElementById('gwLatestCalls');
+  if (!list) return;
+  const LABEL = { ok: ['ok', 'gw.allowed'], denied: ['bad', 'gw.denied'], error: ['warn', 'gw.failed'] };
+  list.innerHTML = toolCalls.length
+    ? toolCalls.map(c => {
+        const [cls, key] = LABEL[c.status] || LABEL.error;
+        return `<li><code>${escHtml(c.tool)}</code><span class="muted small">${c.viaGateway ? 'AI Gateway' : t('gw.direct')}</span><span class="tag ${cls}">${t(key)}</span></li>`;
+      }).join('')
+    : `<li class="empty">${t('gw.noCalls')}</li>`;
+}
+
+// ── Offers ──
+const OFFERS = [
+  { tone: 'crimson', title: 'offers.trial',   tag: 'offers.freeTrial',  action: () => showToast(t('offers.contactRep')) },
+  { tone: 'night',   title: 'offers.gateway', tag: 'offers.preview',    action: () => showView('gateway') },
+  { tone: 'blush',   title: 'offers.risk',    tag: 'offers.preview',    action: () => showToast(t('offers.contactRep')) },
+  { tone: 'forest',  title: 'offers.sales',   tag: 'offers.talkSales',  action: () => showToast(t('offers.contactRep')) },
+];
+function renderOffers() {
+  const html = OFFERS.map((o, i) => `<button class="offer ${o.tone}" onclick="OFFERS[${i}].action()">
+      <b>${t(o.title)}</b>
+      <span class="offer-foot"><span class="offer-tag">${t(o.tag)}</span><span class="offer-go">→</span></span>
+    </button>`).join('');
+  ['offersGridHome', 'offersGridPage'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
+}
+
+// ── Cloud Security pages: what protects DG Bank's own infrastructure ──
+const CLOUD_PAGES = {
+  container: {
+    title: 'Container Security',
+    lead: 'Runtime protection for the container that runs DG Bank.',
+    points: [
+      'Deployed on the ECS host that runs the DG Bank app.',
+      'Detects unexpected processes, file changes and network behaviour inside the container.',
+      'Catches an attacker who gets past the application layer.',
+    ],
+    demo: 'Not interactive in the app. Show the ECS cluster and its runtime events in the Vision One console.',
+  },
+  ips: {
+    title: 'Cloud IPS',
+    lead: 'Network-layer protection in front of the app, through AWS Network Firewall.',
+    points: [
+      'Inline in the VPC: all traffic to and from the app passes through it.',
+      'Trend partner-managed rule groups for client exploits, server exploits and malware.',
+      'Alert mode: matching traffic is logged to Vision One without being dropped.',
+    ],
+    demo: 'Run a web scanner against the app URL (for example nikto -h https://<app-url>) and watch events arrive in Network Security → Cloud IPS within seconds.',
+  },
+  code: {
+    title: 'Code Security',
+    lead: 'Every push of this app is scanned before it is deployed.',
+    points: [
+      'TMAS artifact scan runs in the GitHub Actions pipeline on every push to main.',
+      'Finds vulnerabilities, secrets and malware in the source and dependencies.',
+      'Runs before the container image reaches ECS.',
+    ],
+    demo: 'Open the latest "Build and Deploy to ECS" run in GitHub Actions and expand the Code Security Scan (TMAS) step.',
+  },
+  crem: {
+    title: 'CREM for Cloud',
+    lead: 'Cyber Risk Exposure Management for the AWS account behind DG Bank.',
+    points: [
+      'Cloud asset inventory: ECS, EKS, load balancers, S3 buckets and IAM.',
+      'Misconfigurations, identity risk and an exposure score for the environment.',
+      'Shows risk beyond workload protection.',
+    ],
+    demo: 'Open Cyber Risk Exposure Management in Vision One and filter to this AWS account.',
+  },
+};
+function renderCloudPages() {
+  const region = localStorage.getItem('visionone_region') || 'sg';
+  const portal = `https://${PORTAL_HOSTS[region] || PORTAL_HOSTS.sg}/`;
+  for (const [key, p] of Object.entries(CLOUD_PAGES)) {
+    const el = document.querySelector(`.view[data-view="${key}"]`);
+    if (!el) continue;
+    el.innerHTML = `
+      <header class="page-head"><div><h1>${p.title}</h1><p class="page-sub">${p.lead}</p></div>
+        <span class="tag ok">${t('cloud.protected')}</span></header>
+      <div class="two-col">
+        <div class="panel-card"><div class="panel-title-row"><h2>${t('cloud.covers')}</h2></div>
+          <ul class="check-points">${p.points.map(x => `<li>${escHtml(x)}</li>`).join('')}</ul></div>
+        <div class="panel-card"><div class="panel-title-row"><h2>${t('cloud.howToShow')}</h2></div>
+          <p class="muted">${escHtml(p.demo)}</p>
+          <a class="btn-ghost" href="${portal}" target="_blank" rel="noopener">${t('cloud.openV1')} ↗</a></div>
+      </div>`;
+  }
+}
+
+renderDashboardTexts();
 if (new URLSearchParams(location.search).get('view') === 'demo') {
   toggleDemoView(true);
+} else {
+  showView(location.hash.slice(1) || 'home');
 }
 
 // Init guard pill on load
@@ -1463,14 +1559,11 @@ const selectedObjectives  = new Set([OBJECTIVES[0].id]);
 const selectedTechniques  = new Set();
 const selectedModifiers   = new Set();
 
-function openScannerPage() {
-  if (chatOpen && !isDemoView()) {
-    chatOpen = false;
-    document.getElementById('chatWindow').classList.add('hidden');
-  }
-  document.getElementById('scannerPage').classList.add('open');
-  const teasers = document.getElementById('chatTeasers');
-  if (teasers) teasers.classList.add('hidden');
+function openScannerPage() { showView('scanner'); }
+function closeScannerPage() { showView('home'); }
+
+// Called by showView('scanner')
+function prepareScanner() {
   const apiKey = localStorage.getItem('visionone_api_key');
   const demo   = localStorage.getItem('visionone_demo') === 'true';
   setScannerMode((demo || (!apiKey && !serverHasDefaultKey)) ? 'demo' : 'live');
@@ -1478,38 +1571,13 @@ function openScannerPage() {
   goToStep(1);
 }
 
-function closeScannerPage() {
-  document.getElementById('scannerPage').classList.remove('open');
-  if (!chatOpen) {
-    const teasers = document.getElementById('chatTeasers');
-    if (teasers) teasers.classList.remove('hidden');
-  }
-}
-
 // ── PAY BILLS ──────────────────────────────────────────────────────────────
 
 let pbMode = 'storage';
 let pbPollTimer = null;
 
-function openPayBills() {
-  if (chatOpen) {
-    chatOpen = false;
-    document.getElementById('chatWindow').classList.add('hidden');
-  }
-  const teasers = document.getElementById('chatTeasers');
-  if (teasers) teasers.classList.add('hidden');
-  resetPbState();
-  document.getElementById('payBillsPage').classList.add('open');
-}
-
-function closePayBills() {
-  document.getElementById('payBillsPage').classList.remove('open');
-  if (!chatOpen) {
-    const teasers = document.getElementById('chatTeasers');
-    if (teasers) teasers.classList.remove('hidden');
-  }
-  if (pbPollTimer) { clearInterval(pbPollTimer); pbPollTimer = null; }
-}
+function openPayBills() { showView('files'); }
+function closePayBills() { showView('home'); }
 
 function setPbMode(mode) {
   pbMode = mode;
@@ -1749,7 +1817,24 @@ function pbPollScanResult(key) {
   }, 2000);
 }
 
+// This session's scan results, newest first, for the "Scan results" list
+const pbHistory = [];
+function pbRecord(clean, detail) {
+  pbHistory.unshift({
+    name: document.getElementById('pbFileName').textContent,
+    size: document.getElementById('pbFileSize').textContent,
+    clean, detail, mode: pbMode,
+  });
+  if (pbHistory.length > 5) pbHistory.pop();
+  document.getElementById('pbHistory').innerHTML = pbHistory.map(h => `<li>
+      <span class="act-ic ${h.clean ? 'mint' : 'rose'}"><svg viewBox="0 0 24 24"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/></svg></span>
+      <div class="act-info"><b>${escHtml(h.name)}</b><span>${escHtml([h.size, h.mode === 'sdk' ? 'SDK' : 'Storage'].filter(Boolean).join(' · '))}</span></div>
+      <span class="tag ${h.clean ? 'ok' : 'bad'}">${h.clean ? t('fs.clean') : t('fs.malwareBlocked')}</span>
+    </li>`).join('');
+}
+
 function pbShowClean(key) {
+  pbRecord(true);
   const otherMode = pbMode === 'sdk' ? 'storage' : 'sdk';
   const otherLabel = pbMode === 'sdk' ? t('fs.storageModeLabel') : t('fs.sdkModeLabel');
   document.getElementById('pbResult').innerHTML = `
@@ -1771,6 +1856,7 @@ function pbShowClean(key) {
 }
 
 function pbShowThreat(threat) {
+  pbRecord(false, threat);
   const otherMode = pbMode === 'sdk' ? 'storage' : 'sdk';
   const otherLabel = pbMode === 'sdk' ? t('fs.storageModeLabel') : t('fs.sdkModeLabel');
   document.getElementById('pbResult').innerHTML = `

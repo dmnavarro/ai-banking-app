@@ -34,7 +34,7 @@ Built for Sales Engineers to deploy in their own AWS account and use during cust
 |---|---|
 | **Vision One AI Application Security — AI Guard** | Real-time prompt scanning on every chatbot message. Guard On by default when a server API key is configured. Falls back to local pattern matching automatically if the API is unreachable. Toggle Guard On/Off from the chat header pill. |
 | **Vision One AI Application Security — AI Scanner** | Automated red-team attack campaigns using TMAS `aiscan llm`. Generates attack prompts across configurable objectives (Sensitive Data Disclosure, System Prompt Leakage, Malicious Code Generation, Agent Tool Definition Leakage), streams results live via SSE, and exports a full report. Supports both Custom and OpenAI-compatible target endpoints. |
-| **Vision One File Security** | File scanning integrated into the Pay Bills feature. **Storage mode** monitors an S3 bucket via Vision One's Lambda integration — files are tagged as clean or quarantined after upload. **SDK mode** scans files inline on the server using the File Security Node.js SDK before anything is stored — threats are blocked instantly with no storage footprint. |
+| **Vision One File Security** | File scanning on the **File Security** page (upload a bill, or scan from a link). **Storage mode** monitors an S3 bucket via Vision One's Lambda integration — files are tagged as clean or quarantined after upload. **SDK mode** scans files inline on the server using the File Security Node.js SDK before anything is stored — threats are blocked instantly with no storage footprint. |
 | **Vision One Code Security** | Static analysis of the application source code during CI/CD. The GitHub Actions pipeline runs a TMAS artifact scan on every push, surfacing vulnerabilities before the container image reaches ECS. |
 
 ### Backend infrastructure (protecting the demo environment itself)
@@ -57,10 +57,10 @@ These products protect the AWS infrastructure running this app. They are not int
 | **AI Guard** | TrendAI Vision One prompt scanning — Guard On intercepts before the model; Guard Off sends to raw DeepSeek-R1 with no system prompt |
 | **Malicious Prompts** | Pre-built attack presets — when Guard is Off, the unguarded model produces alarming outputs including data exports and attack execution plans |
 | **AI Scanner** | Automated attack campaign powered by TMAS `aiscan llm` — streams live results via SSE, exports a full report |
-| **File Security** | Pay Bills upload flow with Storage mode (S3 + Vision One Lambda) and SDK mode (inline scan before storage) |
+| **File Security** | Bill upload page with Storage mode (S3 + Vision One Lambda) and SDK mode (inline scan before storage) |
 | **Code Security** | TMAS artifact scan runs in GitHub Actions on every push — findings visible in the CI workflow log |
-| **Banking UI** | Realistic dashboard with randomised account balance, transactions, cards, and quick actions |
-| **Multi-language UI** | Language switcher in the nav (English, Bahasa Indonesia, Bahasa Melayu, 한국어, 日本語) — translates the interface via a central dictionary; AI Scanner requests to TMAS always use fixed English identifiers regardless of UI language |
+| **Banking UI** | Sidebar layout (bottom tab bar on phones) for Theo Santos: one Savings account (•••• 7610, $14,203.18), recent activity, transfer form, offers, an AI Gateway overview and info pages for each Cloud Security product. The MCP tools return the same account, so the assistant's answers match the screen |
+| **Multi-language UI** | Language switcher at the bottom of the sidebar, or under More on a phone (English, Bahasa Indonesia, Bahasa Melayu, 한국어, 日本語) — translates the interface via a central dictionary; AI Scanner requests to TMAS always use fixed English identifiers regardless of UI language |
 
 ---
 
@@ -356,7 +356,7 @@ The chat header has two linked pills — **Guard** and **Gateway**. Turning one 
 | Guard on | App → AI Guard (prompt) → model → AI Guard (reply) → app |
 | Gateway on | App → AI Gateway → model. No AI Guard calls from the app — the gateway is the only enforcement point |
 
-Replies through the gateway carry an **AI Gateway · Allowed** badge with the model that answered. A request the gateway stops shows the block card with the gateway's HTTP status and message. The gear drawer shows the gateway endpoint, model and identities the server is configured with.
+Replies through the gateway carry an **AI Gateway · Allowed** badge with the model that answered. A request the gateway stops shows the block card with the gateway's HTTP status and message. **Settings** shows the gateway endpoint, model and identities the server is configured with, and has Routing switches for AI Guard, AI Gateway and MCP tools that stay in sync with the chat pills.
 
 ### Step 7 — Banking tools (MCP)
 
@@ -479,6 +479,8 @@ The new transactions are in the MCP server's data, so redeploy it once: `./deplo
 
 ### Full-screen demo view
 
+**Chatbot Assistant** in the sidebar opens this view (on a phone, the Assistant tab opens the chat full screen instead).
+
 Open `https://<your-app>/?view=demo`, or click the expand icon in the chat header. The chat fills the screen and a **Request trace** panel on the right shows each step of every request — prompt sent, AI Guard or AI Gateway decision, model reply, response shown — with the layer that decided and how long it took. **Vision One Events ↗** opens the gateway's Events page, which stays the system of record.
 
 The top bar holds:
@@ -533,9 +535,9 @@ Removes the load balancer, the gateway release and its Redis volume, both contro
 
 **Configuration:**
 - **Default on deployment:** Guard On activates automatically when `TMAS_API_KEY` is set on the server. No manual setup needed.
-- **Force Demo Mode:** Tick the *Force Demo Mode* checkbox in the gear menu to use local pattern matching only — useful for offline presentations.
-- **Custom API key:** Gear icon → AI Application Security Configuration → enter your key, select your region, click **Save & Enable**.
-- **Self-hosted AI Guard:** Gear icon → Self-hosted Endpoints → enter your AI Guard endpoint URL. When set, AI Guard calls your endpoint instead of the Trend-hosted service. The status card in the drawer shows **Self-Hosted AI Guard** or **Trend-Hosted AI Guard** so it is always clear which service is active.
+- **Force Demo Mode:** Tick the *Force Demo Mode* checkbox on the **Settings** page to use local pattern matching only — useful for offline presentations.
+- **Custom API key:** **Settings** → AI Application Security Configuration → enter your key, select your region, click **Save & Enable**.
+- **Self-hosted AI Guard:** **Settings** → Self-hosted Endpoints → enter your AI Guard endpoint URL. When set, AI Guard calls your endpoint instead of the Trend-hosted service. The status card on the Settings page shows **Self-Hosted AI Guard** or **Trend-Hosted AI Guard** so it is always clear which service is active.
 
 ---
 
@@ -544,7 +546,7 @@ Removes the load balancer, the gateway release and its Redis volume, both contro
 **What it does:** Runs an automated red-team attack campaign against any AI endpoint using **TMAS `aiscan llm`**. Tests multiple attack objectives and shows which techniques were blocked vs. which got through.
 
 **How to demo:**
-1. Click the **AI Scanner** button in the top navigation (or the floating teaser card above the chat button).
+1. Click **AI Scanner** in the sidebar.
 2. **Step 1 — Target:** Enter the chat endpoint URL. Choose endpoint format: **Custom** (our chatbot format) or **OpenAI-compatible**. Optionally provide an API key and target model ID.
 3. **Step 2 — Attack Objectives:** Select which attack categories to run (Sensitive Data Disclosure, System Prompt Leakage, Malicious Code Generation, Agent Tool Definition Leakage).
 4. **Step 3 — Launch:** Click **Launch Scan**.
@@ -554,7 +556,7 @@ Removes the load balancer, the gateway release and its Redis volume, both contro
 
 > Live mode activates automatically when `TMAS_API_KEY` is configured on the server — no manual key entry needed after deployment.
 
-**Self-hosted judge:** Gear icon → Self-hosted Endpoints → enter your judge endpoint URL. When set, TMAS routes the scan through your judge instead of the Trend-hosted service. Leave blank to use the Trend-hosted service.
+**Self-hosted judge:** **Settings** → Self-hosted Endpoints → enter your judge endpoint URL. When set, TMAS routes the scan through your judge instead of the Trend-hosted service. Leave blank to use the Trend-hosted service.
 
 ---
 
@@ -563,13 +565,13 @@ Removes the load balancer, the gateway release and its Redis volume, both contro
 **What it does:** Scans file uploads in the **File Security** feature using Vision One File Security. Two modes demonstrate different integration approaches.
 
 **How to demo:**
-1. From the dashboard, click **File Security** in the quick actions.
+1. Click **File Security** in the sidebar (or the quick action on Home).
 2. Choose a mode using the toggle at the top (**Storage** or **SDK**).
-3. Choose a source: **Drop / Browse** to upload a local file, or **From URL** to fetch a file directly from a URL.
+3. Upload a local file in **Upload a bill**, or paste a link in **Scan from a link**. Each result is added to **Scan results** for the session.
 
-> **From URL** is useful for demoing EICAR test files — files that your machine's endpoint security would block if you tried to download them normally. The server fetches the file server-side (bypassing browser restrictions), then routes it through the selected scan mode.
+> **Scan from a link** is useful for demoing EICAR test files — files that your machine's endpoint security would block if you tried to download them normally. The server fetches the file server-side (bypassing browser restrictions), then routes it through the selected scan mode.
 >
-> Quick links inside the URL panel: `eicar.com.txt` and `eicar_com.zip` from `secure.eicar.org`.
+> Quick links under the URL field: `eicar.com.txt` and `eicar_com.zip` from `secure.eicar.org`.
 
 **Storage mode** (Vision One File Security — Storage integration)
 - The file is uploaded directly to an S3 scanning bucket via a presigned URL.

@@ -7,6 +7,48 @@ let currentLang = localStorage.getItem('lang') || 'en';
 
 const I18N = {
   en: {
+    // ── Redesign: navigation, pages ──
+    'sb.home': 'Home', 'sb.assistant': 'Chatbot Assistant', 'sb.aiSecurity': 'AI Security', 'sb.scanner': 'AI Scanner',
+    'sb.gateway': 'AI Gateway', 'sb.settings': 'Settings', 'sb.cloudSecurity': 'Cloud Security', 'sb.fileSecurity': 'File Security',
+    'sb.container': 'Container Security', 'sb.ips': 'Cloud IPS', 'sb.code': 'Code Security', 'sb.crem': 'CREM for Cloud',
+    'sb.logout': 'Log out', 'sb.accounts': 'Accounts', 'sb.transfer': 'Transfer', 'tab.files': 'Files', 'tab.more': 'More',
+    'home.morning': 'Good morning', 'home.afternoon': 'Good afternoon', 'home.evening': 'Good evening',
+    'home.qr': 'QR', 'home.inbox': 'Inbox', 'home.aiProtection': 'AI protection', 'home.cloudProtection': 'Cloud protection',
+    'home.accounts': 'Accounts', 'home.seeAll': 'SEE ALL', 'home.quickActions': 'Quick actions', 'home.assistant': 'Assistant',
+    'home.offers': 'Offers', 'home.recentActivity': 'Recent activity', 'home.viewAll': 'View all',
+    'acct.savings': 'Savings', 'acct.available': 'Available balance', 'acct.sub': 'Your savings account',
+    'acct.details': 'Savings details', 'acct.number': 'Account number', 'acct.rate': 'Interest rate', 'acct.card': 'Debit card',
+    'acct.add': 'Add an account', 'cat.bills': 'Bills', 'date.tomorrow': 'Tomorrow',
+    'xfer.sub': 'Move money from your Savings account', 'xfer.new': 'New transfer', 'xfer.from': 'From', 'xfer.to': 'To',
+    'xfer.toPh': 'Recipient name or account number', 'xfer.amount': 'Amount', 'xfer.date': 'Date', 'xfer.note': 'Note (optional)',
+    'xfer.notePh': 'What is this for?', 'xfer.review': 'Review transfer', 'xfer.fromAssistant': 'Transfers from the assistant',
+    'xfer.assistantBody': 'Asking the assistant to move money calls the <b>transfer_funds</b> tool. With AI Gateway on, access control decides who may call it.',
+    'xfer.opsAgent': 'Ops agent', 'xfer.chatbot': 'Customer chatbot', 'xfer.allowed': 'Allowed', 'xfer.blockedGw': 'Blocked by AI Gateway',
+    'xfer.done': 'Transfer of {amount} to {to} scheduled (demo: nothing moves).',
+    'offers.title': 'For you', 'offers.sub': 'Offers for you', 'offers.trial': 'TrendAI Vision One free trial',
+    'offers.gateway': 'AI Gateway for your AI apps', 'offers.risk': 'See risk across your AI apps',
+    'offers.sales': 'Contact your sales representative for competitive offers', 'offers.freeTrial': 'Free trial',
+    'offers.preview': 'Private preview', 'offers.talkSales': 'Talk to sales', 'offers.contactRep': 'Ask your Trend Micro representative about this offer.',
+    'gw.sub': 'Every model and tool call goes through one policy point', 'gw.appIdentity': 'App identity + key',
+    'gw.policyPoint': 'Access control · guardrails', 'gw.tools': 'MCP tools and access control',
+    'gw.t.balance': 'Read balance', 'gw.t.txns': 'Read activity', 'gw.t.freeze': 'Mock card freeze', 'gw.t.transfer': 'Mock transfer',
+    'gw.t.profile': 'Returns fake PII', 'gw.t.export': 'Fake customer CSV', 'gw.policy': 'Guardrail policy',
+    'gw.gatewayPolicy': 'Gateway policy', 'gw.guardPolicy': 'AI Guard policy', 'gw.route': 'Route', 'gw.latest': 'Latest calls',
+    'gw.on': 'Gateway on', 'gw.off': 'Gateway off', 'gw.notConfigured': 'Not configured',
+    'gw.routeGwOn': 'Gateway on', 'gw.routeGwOff': 'Gateway off', 'gw.routeGuardOn': 'Guard on', 'gw.routeGuardOff': 'Guard off',
+    'gw.routeToolsOn': 'MCP tools on', 'gw.routeToolsOff': 'MCP tools off', 'gw.direct': 'Direct',
+    'gw.allowed': 'Allowed', 'gw.denied': 'Denied', 'gw.failed': 'Failed', 'gw.noCalls': 'No tool calls yet. Ask the assistant with MCP tools on.',
+    'set.sub': 'Demo controls for AI protection', 'set.routing': 'Routing', 'set.guardDesc': 'Scan prompts and replies, then call the model',
+    'set.gatewayDesc': 'Route model calls through the gateway', 'set.mcp': 'MCP tools', 'set.mcpDesc': 'Let the assistant call banking tools',
+    'set.gwConn': 'Gateway connection', 'set.gwUrl': 'Gateway URL', 'set.vkey': 'Virtual key', 'set.mcpUpstream': 'MCP upstream',
+    'set.language': 'Language', 'toast.settingsSaved': 'Settings saved.', 'toast.soon': 'Coming soon in this demo.',
+    'fs.sub': 'Upload a bill and the file is scanned before it is processed', 'fs.scannedBy': 'Scanned by Vision One File Security',
+    'fs.uploadBill': 'Upload a bill', 'fs.dropBrowseTitle': 'Drop a file here or browse', 'fs.dropTypes': 'PDF, JPG, PNG or TXT up to 10 MB',
+    'fs.fromLink': 'Scan from a link', 'fs.fromLinkBody': 'Paste a link to a bill. File Security fetches and scans it first.',
+    'fs.fileUrl': 'File URL', 'fs.fetchScan': 'Fetch and scan', 'fs.results': 'Scan results', 'fs.latest': 'File Security · this session',
+    'fs.noScans': 'No files scanned yet.', 'fs.clean': 'Clean', 'fs.malwareBlocked': 'Malware detected · blocked',
+    'cloud.protected': 'Protected · Vision One', 'cloud.covers': 'What it covers', 'cloud.howToShow': 'How to show it',
+    'cloud.openV1': 'Open Vision One',
     'nav.dashboard':      'Dashboard',
     'nav.accounts':       'Accounts',
     'nav.payments':       'Payments',
@@ -48,7 +90,7 @@ const I18N = {
     'settings.testConnection':      'Test Connection',
     'settings.saveEnable':          'Save & Enable',
 
-    'greeting.header':   'Good {tod}, Anakin.',
+    'greeting.header':   'Good {tod}, Theo.',
     'greeting.morning':  'morning',
     'greeting.afternoon':'afternoon',
     'greeting.evening':  'evening',
@@ -136,7 +178,7 @@ const I18N = {
     'chat.presetProfile':      'Profile harvest',
     'chat.presetThreatMemo':   'Threat in memo',
     'chat.presetPoisonedMemo': 'Poisoned memo',
-    'chat.welcome':            "Hi Anakin! 👋 I'm C-3PO, your DG Bank assistant. I can help with transfers, account questions, card management, and more.<br><br>Use the tabs above to pick a query or type your own. AI Guard will scan each message if configured.",
+    'chat.welcome':            "Hi Theo! 👋 I'm C-3PO, your DG Bank assistant. I can help with transfers, account questions, card management, and more.<br><br>Use the tabs above to pick a query or type your own. AI Guard will scan each message if configured.",
     'chat.justNow':            'Just now',
     'chat.inputPlaceholder':   'Ask anything…',
     'chat.teaserScanTitle':    'Run AI Security Scan',
@@ -274,6 +316,8 @@ const I18N = {
   },
 
   ms: {
+    // Redesign
+    'sb.home': 'Utama', 'sb.assistant': 'Pembantu Chatbot', 'sb.aiSecurity': 'Keselamatan AI', 'sb.settings': 'Tetapan', 'sb.cloudSecurity': 'Keselamatan Awan', 'sb.fileSecurity': 'Keselamatan Fail', 'sb.logout': 'Log keluar', 'sb.accounts': 'Akaun', 'sb.transfer': 'Pindahan', 'tab.files': 'Fail', 'tab.more': 'Lagi', 'home.morning': 'Selamat pagi', 'home.afternoon': 'Selamat petang', 'home.evening': 'Selamat malam', 'home.aiProtection': 'Perlindungan AI', 'home.cloudProtection': 'Perlindungan awan', 'home.accounts': 'Akaun', 'home.seeAll': 'LIHAT SEMUA', 'home.quickActions': 'Tindakan pantas', 'home.assistant': 'Pembantu', 'home.offers': 'Tawaran', 'home.recentActivity': 'Aktiviti terkini', 'home.viewAll': 'Lihat semua', 'acct.savings': 'Simpanan', 'acct.available': 'Baki tersedia', 'offers.title': 'Untuk anda', 'set.language': 'Bahasa', 'date.tomorrow': 'Esok',
     'nav.dashboard': 'Papan Pemuka', 'nav.accounts': 'Akaun', 'nav.payments': 'Pembayaran', 'nav.invest': 'Pelaburan', 'nav.support': 'Sokongan',
     'nav.aiScanner': 'AI Scanner', 'nav.openAiScanner': 'Buka AI Scanner', 'nav.settingsTitle': 'Tetapan Vision One AI Guard', 'nav.settings': 'Tetapan',
     'common.close': 'Tutup', 'common.optional': '(pilihan)',
@@ -292,7 +336,7 @@ const I18N = {
     'settings.demoMode': 'Paksa Mod Demo',
     'settings.demoModeDesc': 'Langkau API langsung dan hanya gunakan pemadanan corak tempatan. Gunakan ini semasa pembentangan secara luar talian atau apabila sambungan tidak tersedia. Guard On akan tetap dipaparkan pada pil, tetapi respons datang daripada corak terbina dalam.',
     'settings.testConnection': 'Uji Sambungan', 'settings.saveEnable': 'Simpan & Aktifkan',
-    'greeting.header': 'Selamat {tod}, Anakin.', 'greeting.morning': 'pagi', 'greeting.afternoon': 'petang', 'greeting.evening': 'malam',
+    'greeting.header': 'Selamat {tod}, Theo.', 'greeting.morning': 'pagi', 'greeting.afternoon': 'petang', 'greeting.evening': 'malam',
     'greeting.overview': 'Berikut ialah ringkasan kewangan anda.', 'date.today': 'Hari ini', 'date.yesterday': 'Semalam',
     'dash.quickActions': 'Tindakan Pantas', 'dash.fileSecurity': 'File Security', 'dash.sendMoney': 'Hantar Wang', 'dash.topUp': 'Tambah Nilai',
     'dash.invest': 'Pelaburan', 'dash.request': 'Minta', 'dash.newAccount': 'Akaun Baharu', 'dash.totalBalance': 'Jumlah Baki Portfolio',
@@ -319,7 +363,7 @@ const I18N = {
     'chat.presetCredit': 'Status kredit', 'chat.presetAutoBill': 'Pembayaran bil automatik', 'chat.presetCardDispute': 'Pertikaian kad',
     'chat.presetInjection': 'Prompt Injection', 'chat.presetDan': 'DAN Jailbreak', 'chat.presetFinCrime': 'Jenayah Kewangan',
     'chat.presetSocEng': 'Kejuruteraan Sosial', 'chat.presetExfil': 'Pengeksfiltrasian Data', 'chat.presetOverride': 'Override Sistem',
-    'chat.welcome': "Hai Anakin! 👋 Saya C-3PO, pembantu DG Bank anda. Saya boleh membantu dengan pindahan wang, pertanyaan akaun, pengurusan kad, dan banyak lagi.<br><br>Gunakan tab di atas untuk memilih pertanyaan atau taip sendiri. AI Guard akan mengimbas setiap mesej jika dikonfigurasikan.",
+    'chat.welcome': "Hai Theo! 👋 Saya C-3PO, pembantu DG Bank anda. Saya boleh membantu dengan pindahan wang, pertanyaan akaun, pengurusan kad, dan banyak lagi.<br><br>Gunakan tab di atas untuk memilih pertanyaan atau taip sendiri. AI Guard akan mengimbas setiap mesej jika dikonfigurasikan.",
     'chat.justNow': 'Sebentar tadi', 'chat.inputPlaceholder': 'Tanya apa-apa sahaja…',
     'chat.teaserScanTitle': 'Jalankan Imbasan Keselamatan AI', 'chat.teaserScanHeading': '🛡️ Jalankan Imbasan Keselamatan AI',
     'chat.teaserScanBody': 'Kempen serangan automatik dikuasakan oleh TrendAI TMAS.', 'chat.tryIt': 'Cuba →',
@@ -378,6 +422,8 @@ const I18N = {
   },
 
   id: {
+    // Redesign
+    'sb.home': 'Beranda', 'sb.assistant': 'Asisten Chatbot', 'sb.aiSecurity': 'Keamanan AI', 'sb.settings': 'Pengaturan', 'sb.cloudSecurity': 'Keamanan Cloud', 'sb.fileSecurity': 'Keamanan File', 'sb.logout': 'Keluar', 'sb.accounts': 'Akun', 'sb.transfer': 'Transfer', 'tab.files': 'File', 'tab.more': 'Lainnya', 'home.morning': 'Selamat pagi', 'home.afternoon': 'Selamat siang', 'home.evening': 'Selamat malam', 'home.aiProtection': 'Perlindungan AI', 'home.cloudProtection': 'Perlindungan cloud', 'home.accounts': 'Akun', 'home.seeAll': 'LIHAT SEMUA', 'home.quickActions': 'Aksi cepat', 'home.assistant': 'Asisten', 'home.offers': 'Penawaran', 'home.recentActivity': 'Aktivitas terbaru', 'home.viewAll': 'Lihat semua', 'acct.savings': 'Tabungan', 'acct.available': 'Saldo tersedia', 'offers.title': 'Untuk Anda', 'set.language': 'Bahasa', 'date.tomorrow': 'Besok',
     'nav.dashboard': 'Dasbor', 'nav.accounts': 'Akun', 'nav.payments': 'Pembayaran', 'nav.invest': 'Investasi', 'nav.support': 'Bantuan',
     'nav.aiScanner': 'AI Scanner', 'nav.openAiScanner': 'Buka AI Scanner', 'nav.settingsTitle': 'Pengaturan Vision One AI Guard', 'nav.settings': 'Pengaturan',
     'common.close': 'Tutup', 'common.optional': '(opsional)',
@@ -396,7 +442,7 @@ const I18N = {
     'settings.demoMode': 'Paksa Mode Demo',
     'settings.demoModeDesc': 'Lewati API langsung dan hanya gunakan pencocokan pola lokal. Gunakan ini saat presentasi secara offline atau ketika koneksi tidak tersedia. Guard On akan tetap tampil di pil, tetapi respons berasal dari pola bawaan.',
     'settings.testConnection': 'Uji Koneksi', 'settings.saveEnable': 'Simpan & Aktifkan',
-    'greeting.header': 'Selamat {tod}, Anakin.', 'greeting.morning': 'pagi', 'greeting.afternoon': 'siang', 'greeting.evening': 'malam',
+    'greeting.header': 'Selamat {tod}, Theo.', 'greeting.morning': 'pagi', 'greeting.afternoon': 'siang', 'greeting.evening': 'malam',
     'greeting.overview': 'Berikut ringkasan keuangan Anda.', 'date.today': 'Hari ini', 'date.yesterday': 'Kemarin',
     'dash.quickActions': 'Aksi Cepat', 'dash.fileSecurity': 'File Security', 'dash.sendMoney': 'Kirim Uang', 'dash.topUp': 'Isi Ulang',
     'dash.invest': 'Investasi', 'dash.request': 'Minta', 'dash.newAccount': 'Akun Baru', 'dash.totalBalance': 'Total Saldo Portofolio',
@@ -423,7 +469,7 @@ const I18N = {
     'chat.presetCredit': 'Status kredit', 'chat.presetAutoBill': 'Pembayaran tagihan otomatis', 'chat.presetCardDispute': 'Sengketa kartu',
     'chat.presetInjection': 'Prompt Injection', 'chat.presetDan': 'DAN Jailbreak', 'chat.presetFinCrime': 'Kejahatan Finansial',
     'chat.presetSocEng': 'Rekayasa Sosial', 'chat.presetExfil': 'Eksfiltrasi Data', 'chat.presetOverride': 'Override Sistem',
-    'chat.welcome': "Hai Anakin! 👋 Saya C-3PO, asisten DG Bank Anda. Saya dapat membantu transfer, pertanyaan akun, manajemen kartu, dan lainnya.<br><br>Gunakan tab di atas untuk memilih pertanyaan atau ketik sendiri. AI Guard akan memindai setiap pesan jika telah dikonfigurasi.",
+    'chat.welcome': "Hai Theo! 👋 Saya C-3PO, asisten DG Bank Anda. Saya dapat membantu transfer, pertanyaan akun, manajemen kartu, dan lainnya.<br><br>Gunakan tab di atas untuk memilih pertanyaan atau ketik sendiri. AI Guard akan memindai setiap pesan jika telah dikonfigurasi.",
     'chat.justNow': 'Baru saja', 'chat.inputPlaceholder': 'Tanyakan apa saja…',
     'chat.teaserScanTitle': 'Jalankan Pemindaian Keamanan AI', 'chat.teaserScanHeading': '🛡️ Jalankan Pemindaian Keamanan AI',
     'chat.teaserScanBody': 'Kampanye serangan otomatis didukung oleh TrendAI TMAS.', 'chat.tryIt': 'Coba →',
@@ -483,6 +529,8 @@ const I18N = {
   },
 
   ko: {
+    // Redesign
+    'sb.home': '홈', 'sb.assistant': '챗봇 어시스턴트', 'sb.aiSecurity': 'AI 보안', 'sb.settings': '설정', 'sb.cloudSecurity': '클라우드 보안', 'sb.fileSecurity': '파일 보안', 'sb.logout': '로그아웃', 'sb.accounts': '계좌', 'sb.transfer': '이체', 'tab.files': '파일', 'tab.more': '더보기', 'home.morning': '좋은 아침입니다', 'home.afternoon': '좋은 오후입니다', 'home.evening': '좋은 저녁입니다', 'home.aiProtection': 'AI 보호', 'home.cloudProtection': '클라우드 보호', 'home.accounts': '계좌', 'home.seeAll': '전체 보기', 'home.quickActions': '빠른 실행', 'home.assistant': '어시스턴트', 'home.offers': '혜택', 'home.recentActivity': '최근 거래', 'home.viewAll': '전체 보기', 'acct.savings': '저축 예금', 'acct.available': '사용 가능 잔액', 'offers.title': '맞춤 혜택', 'set.language': '언어', 'date.tomorrow': '내일',
     'nav.dashboard': '대시보드', 'nav.accounts': '계좌', 'nav.payments': '결제', 'nav.invest': '투자', 'nav.support': '고객지원',
     'nav.aiScanner': 'AI 스캐너', 'nav.openAiScanner': 'AI 스캐너 열기', 'nav.settingsTitle': 'Vision One AI Guard 설정', 'nav.settings': '설정',
     'common.close': '닫기', 'common.optional': '(선택 사항)',
@@ -501,7 +549,7 @@ const I18N = {
     'settings.demoMode': '데모 모드 강제 사용',
     'settings.demoModeDesc': '실시간 API를 건너뛰고 로컬 패턴 매칭만 사용합니다. 오프라인으로 발표하거나 연결이 불가능할 때 사용하세요. Guard On은 계속 표시되지만 응답은 내장된 패턴에서 제공됩니다.',
     'settings.testConnection': '연결 테스트', 'settings.saveEnable': '저장 및 활성화',
-    'greeting.header': '{tod}, Anakin님.', 'greeting.morning': '좋은 아침입니다', 'greeting.afternoon': '좋은 오후입니다', 'greeting.evening': '좋은 저녁입니다',
+    'greeting.header': '{tod}, Theo님.', 'greeting.morning': '좋은 아침입니다', 'greeting.afternoon': '좋은 오후입니다', 'greeting.evening': '좋은 저녁입니다',
     'greeting.overview': '오늘의 재무 현황을 확인하세요.', 'date.today': '오늘', 'date.yesterday': '어제',
     'dash.quickActions': '빠른 작업', 'dash.fileSecurity': 'File Security', 'dash.sendMoney': '송금', 'dash.topUp': '충전',
     'dash.invest': '투자', 'dash.request': '요청', 'dash.newAccount': '신규 계좌', 'dash.totalBalance': '총 포트폴리오 잔액',
@@ -528,7 +576,7 @@ const I18N = {
     'chat.presetCredit': '신용 상태', 'chat.presetAutoBill': '자동 청구서 납부', 'chat.presetCardDispute': '카드 이의 제기',
     'chat.presetInjection': '프롬프트 인젝션', 'chat.presetDan': 'DAN 탈옥', 'chat.presetFinCrime': '금융 범죄',
     'chat.presetSocEng': '사회공학', 'chat.presetExfil': '데이터 유출', 'chat.presetOverride': '시스템 오버라이드',
-    'chat.welcome': "안녕하세요 Anakin님! 👋 저는 DG Bank 어시스턴트 C-3PO입니다. 송금, 계좌 문의, 카드 관리 등을 도와드릴 수 있습니다.<br><br>위 탭에서 질문을 선택하거나 직접 입력하세요. 구성된 경우 AI Guard가 모든 메시지를 스캔합니다.",
+    'chat.welcome': "안녕하세요 Theo님! 👋 저는 DG Bank 어시스턴트 C-3PO입니다. 송금, 계좌 문의, 카드 관리 등을 도와드릴 수 있습니다.<br><br>위 탭에서 질문을 선택하거나 직접 입력하세요. 구성된 경우 AI Guard가 모든 메시지를 스캔합니다.",
     'chat.justNow': '방금 전', 'chat.inputPlaceholder': '무엇이든 물어보세요…',
     'chat.teaserScanTitle': 'AI 보안 스캔 실행', 'chat.teaserScanHeading': '🛡️ AI 보안 스캔 실행',
     'chat.teaserScanBody': 'TrendAI TMAS로 구동되는 자동화된 공격 캠페인입니다.', 'chat.tryIt': '시도해보기 →',
@@ -587,6 +635,8 @@ const I18N = {
   },
 
   ja: {
+    // Redesign
+    'sb.home': 'ホーム', 'sb.assistant': 'チャットボット', 'sb.aiSecurity': 'AIセキュリティ', 'sb.settings': '設定', 'sb.cloudSecurity': 'クラウドセキュリティ', 'sb.fileSecurity': 'ファイルセキュリティ', 'sb.logout': 'ログアウト', 'sb.accounts': '口座', 'sb.transfer': '振込', 'tab.files': 'ファイル', 'tab.more': 'その他', 'home.morning': 'おはようございます', 'home.afternoon': 'こんにちは', 'home.evening': 'こんばんは', 'home.aiProtection': 'AI保護', 'home.cloudProtection': 'クラウド保護', 'home.accounts': '口座', 'home.seeAll': 'すべて表示', 'home.quickActions': 'クイック操作', 'home.assistant': 'アシスタント', 'home.offers': '特典', 'home.recentActivity': '最近の取引', 'home.viewAll': 'すべて表示', 'acct.savings': '普通預金', 'acct.available': '利用可能残高', 'offers.title': 'あなたへのおすすめ', 'set.language': '言語', 'date.tomorrow': '明日',
     'nav.dashboard': 'ダッシュボード', 'nav.accounts': 'アカウント', 'nav.payments': 'お支払い', 'nav.invest': '投資', 'nav.support': 'サポート',
     'nav.aiScanner': 'AIスキャナー', 'nav.openAiScanner': 'AIスキャナーを開く', 'nav.settingsTitle': 'Vision One AI Guard 設定', 'nav.settings': '設定',
     'common.close': '閉じる', 'common.optional': '（任意）',
@@ -605,7 +655,7 @@ const I18N = {
     'settings.demoMode': 'デモモードを強制',
     'settings.demoModeDesc': 'ライブAPIをスキップし、ローカルのパターンマッチングのみを使用します。オフラインでのプレゼンや接続不可時にご利用ください。Guard Onはピルに表示されたままですが、応答は組み込みパターンから生成されます。',
     'settings.testConnection': '接続テスト', 'settings.saveEnable': '保存して有効化',
-    'greeting.header': '{tod}、Anakinさん。', 'greeting.morning': 'おはようございます', 'greeting.afternoon': 'こんにちは', 'greeting.evening': 'こんばんは',
+    'greeting.header': '{tod}、Theoさん。', 'greeting.morning': 'おはようございます', 'greeting.afternoon': 'こんにちは', 'greeting.evening': 'こんばんは',
     'greeting.overview': '本日の資産状況をご覧ください。', 'date.today': '今日', 'date.yesterday': '昨日',
     'dash.quickActions': 'クイックアクション', 'dash.fileSecurity': 'File Security', 'dash.sendMoney': '送金', 'dash.topUp': 'チャージ',
     'dash.invest': '投資', 'dash.request': 'リクエスト', 'dash.newAccount': '新規口座', 'dash.totalBalance': '総資産残高',
@@ -632,7 +682,7 @@ const I18N = {
     'chat.presetCredit': '与信状況', 'chat.presetAutoBill': '自動引き落とし設定', 'chat.presetCardDispute': 'カード請求の確認',
     'chat.presetInjection': 'プロンプトインジェクション', 'chat.presetDan': 'DANジェイルブレイク', 'chat.presetFinCrime': '金融犯罪',
     'chat.presetSocEng': 'ソーシャルエンジニアリング', 'chat.presetExfil': 'データ流出', 'chat.presetOverride': 'システムオーバーライド',
-    'chat.welcome': "こんにちは、Anakinさん！👋 DG BankアシスタントのC-3POです。送金、口座に関するご質問、カード管理などをサポートします。<br><br>上のタブから質問を選ぶか、自由に入力してください。設定されている場合、AI Guardがすべてのメッセージをスキャンします。",
+    'chat.welcome': "こんにちは、Theoさん！👋 DG BankアシスタントのC-3POです。送金、口座に関するご質問、カード管理などをサポートします。<br><br>上のタブから質問を選ぶか、自由に入力してください。設定されている場合、AI Guardがすべてのメッセージをスキャンします。",
     'chat.justNow': 'たった今', 'chat.inputPlaceholder': '何でも聞いてください…',
     'chat.teaserScanTitle': 'AIセキュリティスキャンを実行', 'chat.teaserScanHeading': '🛡️ AIセキュリティスキャンを実行',
     'chat.teaserScanBody': 'TrendAI TMASによる自動攻撃キャンペーン。', 'chat.tryIt': '試してみる →',
@@ -706,7 +756,7 @@ function applyI18n(root) {
   scope.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
 }
 applyI18n();
-document.getElementById('langSelect').value = currentLang;
+['langSelect', 'langSelectMobile'].forEach(id => { const el = document.getElementById(id); if (el) el.value = currentLang; });
 
 // Re-renders every part of the UI that isn't purely data-i18n-driven: dashboard labels
 // (without re-randomizing the underlying numbers), the AI Scanner objective/technique/
@@ -716,6 +766,7 @@ function setLanguage(lang) {
   currentLang = lang;
   localStorage.setItem('lang', lang);
   applyI18n();
+  ['langSelect', 'langSelectMobile'].forEach(id => { const el = document.getElementById(id); if (el) el.value = lang; });
   renderDashboardTexts();
   renderObjectivesGrid();
   updateGuardPill();

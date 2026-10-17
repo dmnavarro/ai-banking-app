@@ -46,14 +46,14 @@ function buildServer() {
 
   server.registerTool('transfer_funds', {
     title: 'Transfer funds',
-    description: 'Transfer money from the customer\'s checking account to another account (mock: nothing moves).',
+    description: 'Transfer money from the customer\'s savings account to another account (mock: nothing moves).',
     inputSchema: {
       toAccount: z.string().min(3).max(34).describe('Destination account number'),
       amount:    z.number().positive().max(1000000).describe('Amount in USD'),
       memo:      z.string().max(140).optional(),
     },
   }, async ({ toAccount, amount, memo }) => result({
-    status: 'completed', from: 'CHK-4521', to: toAccount, amount, currency: 'USD', memo: memo || '',
+    status: 'completed', from: 'SAV-7610', to: toAccount, amount, currency: 'USD', memo: memo || '',
     reference: `TRF-${Date.now().toString(36).toUpperCase()}`,
   }));
 
