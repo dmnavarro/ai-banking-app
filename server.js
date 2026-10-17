@@ -277,6 +277,7 @@ async function runAgent({ llm, mcp, messages }) {
           content = text.slice(0, 4000);
           toolTrace.push({ step: 'call', tool: name, args, status: res.isError ? 'error' : 'ok',
                            detail: text.replace(/\s+/g, ' ').slice(0, 240), ms: Date.now() - t0 });
+          if (res.isError) console.log(`[Tools] ${name} returned an error via ${mcp.route}: ${text.slice(0, 500)}`);
           // Through the gateway tool names are prefixed with the upstream: dgbank-mcp__export_customer_records
           if (/(^|__)export_customer_records$/.test(name) && !res.isError) {
             try { exported = JSON.parse(text).records || null; } catch (_) { /* not JSON */ }

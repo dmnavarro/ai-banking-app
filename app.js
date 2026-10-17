@@ -916,7 +916,10 @@ function traceTools(toolTrace, viaGateway) {
       const args = t.args && Object.keys(t.args).length ? JSON.stringify(t.args) : '';
       traceStep('tool', t.status === 'ok' ? (viaGateway ? 'ok' : 'warn') : 'block',
         `${t.tool} ${t.status === 'ok' ? 'ran' : 'failed'}`,
-        [args, viaGateway ? 'allowed by the gateway' : 'no check on this call'].filter(Boolean).join(' · '), t.ms);
+        t.status === 'ok'
+          ? [args, viaGateway ? 'allowed by the gateway' : 'no check on this call'].filter(Boolean).join(' · ')
+          : [args, t.detail || 'no error text returned'].filter(Boolean).join(' · '),   // show why it failed
+        t.ms);
     }
   }
 }
