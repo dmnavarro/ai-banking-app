@@ -38,6 +38,10 @@
       <span data-i18n="sb.home">Home</span>
     </a>
     <div class="sb-section" data-i18n="sb.aiSecurity">AI Security</div>
+    <a href="#gateway" class="sb-item" data-nav="gateway" onclick="showView('gateway');return false;">
+      <svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>
+      <span data-i18n="sb.howItWorks">How It Works</span>
+    </a>
     <a href="#assistant" class="sb-item" data-nav="assistant" onclick="showView('assistant');return false;">
       <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><path d="M7 11.2 17 6M7 12.8 17 18"/></svg>
       <span data-i18n="sb.aiGateway">AI Gateway</span>
@@ -45,10 +49,6 @@
     <a href="#scanner" class="sb-item" data-nav="scanner" onclick="showView('scanner');return false;">
       <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M4 12h16"/></svg>
       <span data-i18n="sb.scanner">AI Scanner</span>
-    </a>
-    <a href="#gateway" class="sb-item" data-nav="gateway" onclick="showView('gateway');return false;">
-      <svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>
-      <span data-i18n="sb.howItWorks">How It Works</span>
     </a>
     <a href="#agents" class="sb-item" data-nav="agents" onclick="showView('agents');return false;">
       <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/><path d="m9 9.5 2 1.5-2 1.5M13 13h2"/></svg>
@@ -383,8 +383,8 @@
     <div class="panel-card more-list">
       <a href="#accounts" onclick="showView('accounts');return false;" data-i18n="sb.accounts">Accounts</a>
       <a href="#offers" onclick="showView('offers');return false;" data-i18n="offers.title">For you</a>
-      <a href="#scanner" onclick="showView('scanner');return false;" data-i18n="sb.scanner">AI Scanner</a>
       <a href="#gateway" onclick="showView('gateway');return false;" data-i18n="sb.howItWorks">How It Works</a>
+      <a href="#scanner" onclick="showView('scanner');return false;" data-i18n="sb.scanner">AI Scanner</a>
       <a href="#agents" onclick="showView('agents');return false;" data-i18n="sb.agents">Laptop Agents</a>
       <a href="#settings" onclick="showView('settings');return false;" data-i18n="sb.settings">Settings</a>
       <a href="#container" onclick="showView('container');return false;" data-i18n="sb.container">Container Security</a>
