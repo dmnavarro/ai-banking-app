@@ -358,6 +358,22 @@ The chat header has two linked pills — **Guard** and **Gateway**. Turning one 
 
 Replies through the gateway carry an **AI Gateway · Allowed** badge with the model that answered. A request the gateway stops shows the block card with the gateway's HTTP status and message. The gear drawer shows the gateway endpoint, model and identities the server is configured with.
 
+### Full-screen demo view
+
+Open `https://<your-app>/?view=demo`, or click the expand icon in the chat header. The chat fills the screen and a **Request trace** panel on the right shows each step of every request — prompt sent, AI Guard or AI Gateway decision, model reply, response shown — with the layer that decided and how long it took. **Vision One Events ↗** opens the gateway's Events page, which stays the system of record.
+
+The top bar holds:
+
+| Control | What it does |
+|---|---|
+| **Test 1–4** | Sets Guard, Gateway and Tools in one click (the four baseline cases). Tests 3–4 need the banking tools (M4) |
+| **Tools** | Gives C-3PO its banking tools (M4) |
+| **Chat as** | Which virtual key the server sends to the gateway: `c3po-assistant` (Retail Digital) or `ops-analyst-agent` (Fraud and Ops). Only affects Gateway mode |
+| **Clear** | Clears the conversation, model history and trace |
+| **Exit** | Back to the banking dashboard (also drops `?view=demo`) |
+
+The Guard and Gateway pills stay in the chat header and can still be flipped by hand; the matching Test button lights up when the switches match it.
+
 ### Tear down
 
 ```bash

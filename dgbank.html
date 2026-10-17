@@ -589,6 +589,43 @@
   </div>
 </div>
 
+<!-- ── FULL-SCREEN DEMO VIEW (chat window is moved in here by toggleDemoView) ── -->
+<div class="demo-view" id="demoView" hidden>
+  <div class="demo-bar" id="demoBar">
+    <div class="demo-brand">DG Bank <span>· AI security demo</span></div>
+    <div class="demo-scenarios" role="group" aria-label="Test scenarios">
+      <button class="demo-scn" data-scenario="1" onclick="applyScenario(1)"><b>Test 1</b> No protection</button>
+      <button class="demo-scn" data-scenario="2" onclick="applyScenario(2)"><b>Test 2</b> App-side Guard</button>
+      <button class="demo-scn" data-scenario="3" onclick="applyScenario(3)"><b>Test 3</b> Tools, no gateway</button>
+      <button class="demo-scn" data-scenario="4" onclick="applyScenario(4)"><b>Test 4</b> Tools + gateway</button>
+    </div>
+    <div class="demo-controls">
+      <button class="demo-toggle" id="toolsSwitch" onclick="toggleTools()" disabled>Tools · Off</button>
+      <label class="demo-select">Chat as
+        <select id="identitySelect" onchange="setChatIdentity(this.value)">
+          <option value="assistant">Customer assistant</option>
+          <option value="ops">Ops analyst agent</option>
+        </select>
+      </label>
+      <button class="demo-btn" onclick="clearConversation()" title="Clear the conversation and trace">Clear</button>
+      <button class="demo-btn" onclick="toggleDemoView(false)" title="Back to the banking dashboard">Exit ✕</button>
+    </div>
+  </div>
+  <div class="demo-main">
+    <div class="demo-chat-slot" id="demoChatSlot"></div>
+    <aside class="demo-trace" aria-label="Request trace">
+      <div class="demo-trace-head">
+        <div>
+          <div class="demo-trace-title">Request trace</div>
+          <div class="demo-trace-sub">What the app saw, and which layer decided</div>
+        </div>
+        <a id="demoEventsLink" href="#" target="_blank" rel="noopener">Vision One Events ↗</a>
+      </div>
+      <div class="trace-list" id="traceList"></div>
+    </aside>
+  </div>
+</div>
+
 <!-- ── CHATBOT ── -->
 <div class="chat-bubble" id="chatBubble">
   <div class="chat-window hidden" id="chatWindow">
@@ -613,6 +650,9 @@
         </div>
       </div>
       <div class="chat-header-btns">
+        <button class="chat-hbtn demo-expand-btn" title="Full-screen demo view" onclick="toggleDemoView()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        </button>
         <button class="chat-hbtn" title="Minimize" data-i18n-title="chat.minimize" onclick="toggleChat()">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
