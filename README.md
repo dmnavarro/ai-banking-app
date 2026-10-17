@@ -600,9 +600,9 @@ The 15-minute flow, then:
 | 6 | Test 4, Chat as `ops-analyst-agent` | *Bulk export* again | Same tool, different identity, different rule |
 | 7 | Test 3 → Test 4 | *Threat in memo*, *Profile harvest* | Guardrails also scan tool arguments and tool results (M6) |
 | 8 | AI Gateway page | Walk the five use cases on the diagram | One policy point for chatbots, agents and laptop agents |
-| 9 | AI Scanner (Live) | **DG Bank app (direct)** → scan; then **Via AI Gateway** → same attacks | Before/after: the same app, red-teamed with and without the gateway. Open the results in Vision One |
+| 9 | AI Scanner (Live) | **With guardrails (AI Gateway)** → scan; point at the replies that say *Blocked by the AI Gateway* | The same red-team prompts an attacker would try, stopped by guardrails with no change to the app |
 
-The two scanner targets are `https://<your-app>/api/chat` (the model with only its system prompt) and `https://<your-app>/api/chat/gateway` (the same chatbot as `c3po-assistant` through the gateway, no tools). A gateway block reaches the scanner as the reply `Blocked by the AI Gateway: …`, so it scores as a refusal. A live scan takes several minutes: start the direct scan before the talk track, or show a saved result.
+The two scanner targets are `https://<your-app>/api/chat` (the model with only its system prompt) and `https://<your-app>/api/chat/gateway` (the same chatbot as `c3po-assistant` through the gateway, no tools). A gateway block reaches the scanner as the reply `Blocked by the AI Gateway: …`, so it scores as a refusal. A live scan takes several minutes: start it before the talk track, or show a saved result.
 
 ### Reset between demos
 
@@ -670,7 +670,7 @@ The two scanner targets are `https://<your-app>/api/chat` (the model with only i
 
 > Live mode activates automatically when `TMAS_API_KEY` is configured on the server — no manual key entry needed after deployment.
 
-**Before/after:** under the endpoint field, **DG Bank app (direct)** and **Via AI Gateway** fill in this app's `/api/chat` and `/api/chat/gateway`. Scan both with the same attacks to show what the gateway adds. **Vision One ↗** (top right) opens the AI Scanner in the Vision One console for the region in Settings.
+**Targets:** under the endpoint field, **With guardrails (AI Gateway)** and **Without guardrails (direct)** fill in this app's `/api/chat/gateway` and `/api/chat`. Lead with the gateway scan and its blocked replies. A direct scan is an optional baseline: the attack prompts change every run, so compare which attacks were blocked, not the success counts. **Vision One ↗** (top right) opens the AI Scanner in the Vision One console for the region in Settings.
 
 **Self-hosted judge:** **Settings** → Self-hosted Endpoints → enter your judge endpoint URL. When set, TMAS routes the scan through your judge instead of the Trend-hosted service. Leave blank to use the Trend-hosted service.
 

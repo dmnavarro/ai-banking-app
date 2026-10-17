@@ -1970,3 +1970,6 @@ a.btn-primary { text-decoration: none; display: inline-flex; align-items: center
 .fs-wrap .two-col > .panel-card .pb-dropzone { flex: 1; display: flex; flex-direction: column; justify-content: center; }
 .fs-wrap .two-col > .panel-card .pb-url-panel { flex: 1; }
 .fs-wrap .two-col > .panel-card .fs-url-box { margin: auto 0; }
+/* AI Scanner quick targets: the selected one in the page's red, readable on the light card */
+.sc-target-presets .smode-btn { border: 1px solid #ECDBD8; background: #fff; color: #6B5054; border-radius: 999px; padding: .35rem .8rem; }
+.sc-target-presets .smode-btn.active { background: #9E1B2E; border-color: #9E1B2E; color: #fff; }
