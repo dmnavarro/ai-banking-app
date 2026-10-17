@@ -1927,3 +1927,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .sc-target-presets { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .5rem; font-size: .8rem; color: var(--steel); }
 .sc-v1-link { margin-left: .75rem; font-size: .82rem; font-weight: 700; color: var(--blue); text-decoration: none; white-space: nowrap; }
 .sc-v1-link:hover { text-decoration: underline; }
+
+/* AI Gateway page: where to try each use case */
+.gw-cta { padding: .75rem 1rem; border-radius: 14px; background: #FEF0F1; border: 1px solid #F6D3D8; color: #6E4F53; font-size: .9rem; }
+.gw-cta a, .gwr .d-try a { color: #9E1B2E; font-weight: 700; }
+.gwr .d-try { display: block; margin-top: .35rem; font-size: 13px; color: #8A6A6E; }
+.gwr .d-try code { font-size: 12px; }
