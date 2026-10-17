@@ -204,10 +204,15 @@ app.post('/api/chat', async (req, res) => {
           },
         });
       }
+      const reply = extractReply(r.data);
+      if (!reply) {
+        // 200 without answer text — log what came back (e.g. finish_reason, a non-JSON body)
+        console.log(`[Gateway] empty reply, body: ${JSON.stringify(r.data).slice(0, 1500)}`);
+      }
       return res.json({
         route: 'gateway', identity,
         model: r.data?.model || GATEWAY_MODEL,
-        reply: extractReply(r.data) || 'Sorry, I could not generate a response.',
+        reply: reply || 'Sorry, I could not generate a response.',
       });
     } catch (e) {
       const msg = e.name === 'AbortError' ? 'AI Gateway request timed out' : e.message;
@@ -225,10 +230,12 @@ app.post('/api/chat', async (req, res) => {
         const msg = r.data?.error?.message || r.data?.raw || `HTTP ${r.status}`;
         return res.status(502).json({ error: msg });
       }
+      const reply = extractReply(r.data);
+      if (!reply) console.log(`[Direct] empty reply, body: ${JSON.stringify(r.data).slice(0, 1500)}`);
       return res.json({
         route: 'direct',
         model: r.data?.model || DIRECT_LLM_MODEL,
-        reply: extractReply(r.data) || 'Sorry, I could not generate a response.',
+        reply: reply || 'Sorry, I could not generate a response.',
       });
     } catch (e) {
       const msg = e.name === 'AbortError' ? 'Model request timed out' : e.message;
