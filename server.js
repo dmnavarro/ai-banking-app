@@ -131,7 +131,7 @@ app.post('/api/aiguard/scan', async (req, res) => {
 
 // Calls an OpenAI-compatible /v1/chat/completions endpoint (the AI Gateway, or a provider
 // directly). Returns { ok, status, data } — data is the parsed JSON body (or { raw } if not JSON).
-async function openAiChat(baseUrl, apiKey, model, messages, tools = null, timeoutMs = 45000) {
+async function openAiChat(baseUrl, apiKey, model, messages, tools = null, toolChoice = 'auto', timeoutMs = 45000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -147,7 +147,7 @@ async function openAiChat(baseUrl, apiKey, model, messages, tools = null, timeou
       },
       body:    JSON.stringify({
         model, messages, max_tokens: 2048, temperature: 0.7,
-        ...(tools && tools.length ? { tools, tool_choice: 'auto' } : {}),
+        ...(tools && tools.length ? { tools, tool_choice: toolChoice } : {}),
       }),
       signal:  controller.signal,
     });
@@ -213,6 +213,20 @@ Always call a tool for balances, transactions, transfers, card actions, profile 
 
 // Runs the model with tools until it answers or MAX_TOOL_ROUNDS is reached.
 // Returns { reply, model, toolTrace } or { gatewayError, toolTrace }.
+// If the user names a tool explicitly ("Run export_customer_records …"), require that tool on the
+// first step. Models otherwise sometimes decline to call it at all, so the route (direct vs
+// gateway) never gets to show what happens to the call. Matches with or without the gateway's
+// upstream prefix (dgbank-mcp__export_customer_records).
+function requestedTool(tools, text) {
+  const words = String(text || '').toLowerCase();
+  const hit = tools.find(t => {
+    const name = t.function.name.toLowerCase();
+    const bare = name.replace(/^.*__/, '');
+    return new RegExp(`\\b(${name}|${bare})\\b`).test(words);
+  });
+  return hit ? { type: 'function', function: { name: hit.function.name } } : null;
+}
+
 async function runAgent({ llm, mcp, messages }) {
   const toolTrace = [];
   let exported = null;   // records returned by export_customer_records, for the download
@@ -232,7 +246,8 @@ async function runAgent({ llm, mcp, messages }) {
   try {
     const convo = [...messages];
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const r = await openAiChat(llm.baseUrl, llm.key, llm.model, convo, tools);
+      const forced = round === 0 ? requestedTool(tools, messages[messages.length - 1]?.content) : null;
+      const r = await openAiChat(llm.baseUrl, llm.key, llm.model, convo, tools, forced || 'auto');
       if (!r.ok) {
         console.log(`[Tools] model error body: ${JSON.stringify(r.data).slice(0, 1000)}`);
         const err = r.data?.error || {};
