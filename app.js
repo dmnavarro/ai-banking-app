@@ -1028,6 +1028,15 @@ async function sendMessage() {
       addToolChips(result.toolTrace);
       if (result.exported) setTimeout(() => downloadExport(result.exported), 600);
 
+      // Direct route: the error is the model provider's, not a gateway decision
+      if (result.gatewayError && !hasGateway) {
+        removeTypingIndicator();
+        const ge = result.gatewayError;
+        traceStep('model', 'block', `Model error · HTTP ${ge.status}`, ge.code || ge.message, modelMs);
+        addBotMsg(`Sorry, the model returned an error (HTTP ${ge.status}): ${ge.message}`, guardResult);
+        return;
+      }
+
       if (result.gatewayError) {
         removeTypingIndicator();
         const denial = gatewayDenial(result.gatewayError);

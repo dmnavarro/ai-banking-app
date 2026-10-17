@@ -252,7 +252,12 @@ async function runAgent({ llm, mcp, messages }) {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const forced = round === 0 ? requestedTool(tools, messages[messages.length - 1]?.content) : null;
       const choice = denied ? 'none' : (forced || 'auto');
-      const r = await openAiChat(llm.baseUrl, llm.key, llm.model, convo, tools, choice);
+      let r = await openAiChat(llm.baseUrl, llm.key, llm.model, convo, tools, choice);
+      // A required tool the model won't call is a 400 (Groq: tool_use_failed); let it choose instead
+      if (!r.ok && forced && r.status === 400) {
+        console.log(`[Tools] forced ${forced.function.name} refused (${r.data?.error?.code || r.status}); retrying with tool_choice=auto`);
+        r = await openAiChat(llm.baseUrl, llm.key, llm.model, convo, tools, 'auto');
+      }
       if (!r.ok) {
         console.log(`[Tools] model error body: ${JSON.stringify(r.data).slice(0, 1000)}`);
         const err = r.data?.error || {};
