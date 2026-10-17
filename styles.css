@@ -1886,3 +1886,14 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   .page-head > .tag, .page-head > .avatar { margin-left: auto; }
   .page-head > .fs-badge { margin-left: 0; }
 }
+
+/* Live status: the green protection dots pulse, and the chat button pulses like the old AI Scanner button */
+@keyframes dot-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(61,220,151,.7); }
+  70%  { box-shadow: 0 0 0 7px rgba(61,220,151,0); }
+  100% { box-shadow: 0 0 0 0 rgba(61,220,151,0); }
+}
+.pdot.on { animation: dot-pulse 2s ease-out infinite; }
+.chat-toggle { animation: pulse-ring 2.5s ease-out infinite; }
+.chat-toggle:hover { animation: none; }
+@media (prefers-reduced-motion: reduce) { .pdot.on, .chat-toggle { animation: none; } }

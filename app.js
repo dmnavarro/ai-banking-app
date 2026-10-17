@@ -1383,7 +1383,7 @@ function renderGatewayPage() {
 
 // ── Offers ──
 const OFFERS = [
-  { tone: 'crimson', title: 'offers.trial', tag: 'offers.freeTrial', action: () => showToast(t('offers.contactRep')) },
+  { tone: 'crimson', title: 'offers.trial', tag: 'offers.freeTrial', action: () => window.open('https://www.trendaisecurity.com/en/platform/free-trial', '_blank', 'noopener') },
   { tone: 'forest',  title: 'offers.sales', tag: 'offers.talkSales', action: () => showToast(t('offers.contactRep')) },
 ];
 function renderOffers() {
