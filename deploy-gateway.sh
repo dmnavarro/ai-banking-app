@@ -5,6 +5,7 @@ set -euo pipefail
 # DG Bank — EKS cluster for TrendAI AI Gateway
 # Usage: ./deploy-gateway.sh [options]            # create/update the cluster
 #        ./deploy-gateway.sh --expose [options]   # after the Helm install
+#        ./deploy-gateway.sh --deploy-mcp [options] # build + deploy the DG Bank MCP server
 #        ./deploy-gateway.sh --delete [options]   # tear everything down
 #
 # What the default run does (in order):
@@ -44,6 +45,7 @@ Usage: $0 [--expose | --delete] [options]
 Modes:
   (default)            Create or update the EKS cluster and install the AWS Load Balancer Controller
   --expose             After the console Helm install: add an internal NLB in front of the gateway
+  --deploy-mcp         Build the DG Bank MCP server (mcp/), push it to ECR and run it in the cluster
   --delete             Remove the internal NLB, the gateway release and the EKS stack
 
 Optional:
@@ -64,6 +66,7 @@ EOF
 while [[ $# -gt 0 ]]; do
   case $1 in
     --expose)          MODE="expose";             shift ;;
+    --deploy-mcp)      MODE="deploy-mcp";         shift ;;
     --delete)          MODE="delete";             shift ;;
     --region)          REGION="$2";               shift 2 ;;
     --ecs-stack)       ECS_STACK="$2";            shift 2 ;;
@@ -88,7 +91,9 @@ LBC_POLICY_NAME="${CLUSTER_NAME}-lbc-policy"
 # ---------------------------------------------------------------------------
 echo ""
 echo "Checking prerequisites..."
-for cmd in aws kubectl helm jq curl; do
+REQUIRED=(aws kubectl helm jq curl)
+[[ "$MODE" == "deploy-mcp" ]] && REQUIRED+=(docker openssl)
+for cmd in "${REQUIRED[@]}"; do
   if ! command -v "$cmd" &>/dev/null; then
     echo "Error: '$cmd' is not installed or not in PATH"
     exit 1
@@ -209,6 +214,77 @@ if [[ "$MODE" == "expose" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# --deploy-mcp — DG Bank banking tools (MCP server) in the cluster
+#   In-cluster Service  → the AI Gateway's MCP upstream (Test 4)
+#   Internal NLB        → the DG Bank app calling the tools directly (Test 3)
+# The bearer token is generated once, kept in a Kubernetes Secret and copied to
+# SSM (/dgbank/mcp-token) so the ECS app can read it.
+# ---------------------------------------------------------------------------
+if [[ "$MODE" == "deploy-mcp" ]]; then
+  use_cluster
+  MCP_NS="dgbank-mcp"
+  MCP_REPO="dgbank-mcp"
+  ECR_HOST="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
+  MCP_TAG="$(date +%Y%m%d%H%M%S)"
+  MCP_IMAGE="$ECR_HOST/$MCP_REPO:$MCP_TAG"
+
+  echo "Ensuring ECR repository $MCP_REPO exists..."
+  aws ecr describe-repositories --repository-names "$MCP_REPO" --region "$REGION" > /dev/null 2>&1 || \
+    aws ecr create-repository --repository-name "$MCP_REPO" --region "$REGION" \
+      --image-scanning-configuration scanOnPush=true > /dev/null
+
+  echo "Building and pushing $MCP_IMAGE (linux/amd64)..."
+  aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ECR_HOST" > /dev/null
+  docker build --platform linux/amd64 -t "$MCP_IMAGE" "$SCRIPT_DIR/mcp"
+  docker push "$MCP_IMAGE" > /dev/null
+  echo ""
+
+  kubectl get namespace "$MCP_NS" > /dev/null 2>&1 || kubectl create namespace "$MCP_NS" > /dev/null
+  if ! kubectl get secret dgbank-mcp-token -n "$MCP_NS" > /dev/null 2>&1; then
+    echo "Generating MCP bearer token..."
+    kubectl create secret generic dgbank-mcp-token -n "$MCP_NS" \
+      --from-literal=token="$(openssl rand -hex 24)" > /dev/null
+  fi
+  MCP_TOKEN=$(kubectl get secret dgbank-mcp-token -n "$MCP_NS" -o jsonpath='{.data.token}' | base64 --decode)
+  aws ssm put-parameter --name /dgbank/mcp-token --type SecureString --overwrite \
+    --value "$MCP_TOKEN" --region "$REGION" > /dev/null
+  echo "Token stored in Secret $MCP_NS/dgbank-mcp-token and SSM /dgbank/mcp-token."
+
+  VPC_CIDR=$(aws ec2 describe-vpcs --vpc-ids "$(get_output VpcId)" --region "$REGION" \
+    --query "Vpcs[0].CidrBlock" --output text)
+  sed -e "s|__IMAGE__|$MCP_IMAGE|" -e "s|__VPC_CIDR__|$VPC_CIDR|" "$SCRIPT_DIR/mcp/k8s.yaml" | kubectl apply -f -
+  kubectl rollout status deployment/dgbank-mcp -n "$MCP_NS" --timeout=180s
+
+  echo "Waiting for the internal load balancer address (~2 minutes)..."
+  MCP_HOST=""
+  for _ in $(seq 1 40); do
+    MCP_HOST=$(kubectl get svc dgbank-mcp-internal -n "$MCP_NS" \
+      -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+    [[ -n "$MCP_HOST" ]] && break
+    sleep 6
+  done
+
+  echo ""
+  echo "================================================="
+  echo "  DG Bank MCP server deployed ($MCP_TAG)"
+  echo "================================================="
+  echo ""
+  echo "1. Vision One console → AI Gateway → Resources → MCP → Add MCP upstream:"
+  echo "     Name:       dgbank-mcp"
+  echo "     Transport:  HTTP"
+  echo "     URL:        http://dgbank-mcp.$MCP_NS.svc.cluster.local/mcp"
+  echo "     Auth:       Secret token"
+  echo "     Token:      $MCP_TOKEN"
+  echo "   Then run tool discovery and check Resources → Discovered Tools (6 tools)."
+  echo ""
+  echo "2. Point the DG Bank app at the tools (direct route, Test 3):"
+  echo "     ./deploy-ecs.sh --github-org <org> --skip-oidc --mcp-url http://${MCP_HOST:-<pending NLB>}/mcp"
+  echo "   The NLB needs 2-3 minutes before its targets are healthy."
+  echo ""
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
 # --delete — remove the NLB first so its ENIs and security groups don't block
 # the stack delete, then the gateway release, controller and stack
 # ---------------------------------------------------------------------------
@@ -230,6 +306,11 @@ if [[ "$MODE" == "delete" ]]; then
       # CSI driver is still running so it removes the EBS volumes too.
       echo "Deleting the gateway's persistent volumes..."
       kubectl delete pvc --all -n "$GW_RELEASE_NS" --wait=true || true
+    fi
+
+    if kubectl get namespace dgbank-mcp > /dev/null 2>&1; then
+      echo "Removing the DG Bank MCP server and its load balancer..."
+      kubectl delete namespace dgbank-mcp --wait=true || true
     fi
 
     echo "Uninstalling Amazon EBS CSI driver..."

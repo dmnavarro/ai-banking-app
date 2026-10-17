@@ -1,0 +1,73 @@
+# DG Bank MCP server in the AI Gateway cluster. Applied by: deploy-gateway.sh --deploy-mcp
+# (__IMAGE__ and __VPC_CIDR__ are filled in by the script; the token Secret is created there too).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dgbank-mcp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dgbank-mcp
+  namespace: dgbank-mcp
+  labels: { app: dgbank-mcp }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: dgbank-mcp }
+  template:
+    metadata:
+      labels: { app: dgbank-mcp }
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: mcp
+          image: __IMAGE__
+          ports:
+            - { name: http, containerPort: 8080 }
+          env:
+            - name: MCP_TOKEN
+              valueFrom:
+                secretKeyRef: { name: dgbank-mcp-token, key: token }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { memory: 256Mi }
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+---
+# In-cluster address — what the AI Gateway uses as the MCP upstream (Test 4)
+apiVersion: v1
+kind: Service
+metadata:
+  name: dgbank-mcp
+  namespace: dgbank-mcp
+spec:
+  selector: { app: dgbank-mcp }
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+# Internal NLB — what the DG Bank app on ECS uses to call the tools directly (Test 3)
+apiVersion: v1
+kind: Service
+metadata:
+  name: dgbank-mcp-internal
+  namespace: dgbank-mcp
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+spec:
+  type: LoadBalancer
+  selector: { app: dgbank-mcp }
+  loadBalancerSourceRanges: [__VPC_CIDR__]
+  ports:
+    - { name: http, port: 80, targetPort: http }

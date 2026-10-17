@@ -1,0 +1,14 @@
+{
+  "name": "dgbank-mcp",
+  "version": "1.0.0",
+  "description": "DG Bank banking tools exposed over MCP (Streamable HTTP) for the AI Gateway demo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "express": "^4.18.2",
+    "zod": "^3.25.0"
+  }
+}
