@@ -1452,6 +1452,8 @@ body.demo-mode .chat-bubble { display: none; }
 }
 .demo-select select option { color: var(--text); }
 .demo-select select:disabled { opacity: .45; }
+.demo-select.inactive select { opacity: .45; }
+.demo-hint { font-size: .66rem; font-style: italic; color: rgba(255,255,255,.45); white-space: nowrap; }
 
 .demo-main {
   display: grid; grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);

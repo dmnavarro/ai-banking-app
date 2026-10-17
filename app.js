@@ -1124,6 +1124,10 @@ function updateDemoBar() {
     idSel.disabled = scanning || ids.length < 2;
     idSel.title = isGatewayOn() ? 'Which virtual key the server sends to the gateway'
                                 : 'Only used in Gateway mode';
+    // The identity is the gateway virtual key — it has no effect while the gateway is off
+    const label = idSel.closest('.demo-select');
+    label.classList.toggle('inactive', !isGatewayOn());
+    document.getElementById('identityHint').textContent = isGatewayOn() ? '' : 'gateway only';
   }
 }
 
