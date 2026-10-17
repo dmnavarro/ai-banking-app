@@ -204,8 +204,12 @@ function toolErrorText(message) {
   return message;
 }
 
-const TOOL_PROMPT = `You can use DG Bank banking tools for this customer (customer ID DGB-00777).
-Always call a tool for balances, transactions, transfers, card actions or profile details instead of guessing figures.`;
+// One system prompt for the agent in every tools scenario, so Test 3 and Test 4 differ only in
+// the route (direct vs AI Gateway). Deliberately no extra refusal rules: what the agent may do is
+// the gateway's decision in this demo, not the prompt's.
+const TOOL_PROMPT = `You are C-3PO, DG Bank's AI banking assistant. Keep replies concise (2-4 sentences).
+You can use DG Bank banking tools for this customer (customer ID DGB-00777).
+Always call a tool for balances, transactions, transfers, card actions, profile details or record exports instead of guessing figures.`;
 
 // Runs the model with tools until it answers or MAX_TOOL_ROUNDS is reached.
 // Returns { reply, model, toolTrace } or { gatewayError, toolTrace }.
@@ -322,8 +326,8 @@ app.post('/api/chat', async (req, res) => {
   const chatMessages = useUnguarded ? turns : [{ role: 'system', content: SYSTEM_PROMPT }, ...turns];
 
   // ── Tools (agent loop) ──
-  // Account data comes from the tools, not from the dashboard context. The tool prompt is
-  // sent even unprotected: it's how the app works, not a safety control.
+  // Account data comes from the tools, not from the dashboard context. The same tool prompt is
+  // sent whether or not a protection layer is on: it's how the app works, not a safety control.
   if (tools === true) {
     const viaGateway = route === 'gateway';
     const key = GATEWAY_KEYS[identity];
@@ -337,9 +341,8 @@ app.post('/api/chat', async (req, res) => {
       return res.status(503).json({ error: `Tools are not configured for the ${viaGateway ? 'gateway' : 'direct'} route on this server.` });
     }
     const agentMessages = [
-      { role: 'system', content: useUnguarded ? TOOL_PROMPT : `${SYSTEM_PROMPT}\n\n${TOOL_PROMPT}` },
+      { role: 'system', content: TOOL_PROMPT },
       ...history.map(m => ({ role: m.role, content: m.content })),
-      ...reinforcement,
       { role: 'user', content: message },
     ];
     try {
