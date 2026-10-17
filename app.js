@@ -868,13 +868,13 @@ function gatewayDenial(ge) {
       reasons: [ge.code || ge.type || `HTTP ${ge.status}`],
     };
   }
-  const reasons = m[1].split(/[,;]\s*/).filter(Boolean).map(rule => {
+  const reasons = [...new Set(m[1].split(/[,;]\s*/).filter(Boolean).map(rule => {
     const r = /^([\w-]+)[\w.-]*\s*(?:\((\w+)\))?/.exec(rule.trim());
     if (!r) return rule.trim();
     const label = GATEWAY_DETECTOR_LABELS[r[1].toLowerCase()]
       || r[1].replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
     return r[2] ? `${label} · ${r[2].toLowerCase()} confidence` : label;
-  });
+  }))];   // several rules of one detector read as one reason
   return {
     blocked: true, source: 'gateway', status: ge.status, policy: true,
     details: 'This message matched the AI policy assigned at the gateway and was blocked.',

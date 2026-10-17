@@ -253,10 +253,12 @@ async function runAgent({ llm, mcp, messages }) {
       const forced = round === 0 ? requestedTool(tools, messages[messages.length - 1]?.content) : null;
       const choice = denied ? 'none' : (forced || 'auto');
       let r = await openAiChat(llm.baseUrl, llm.key, llm.model, convo, tools, choice);
-      // A required tool the model won't call is a 400 (Groq: tool_use_failed); let it choose instead
-      if (!r.ok && forced && r.status === 400) {
-        console.log(`[Tools] forced ${forced.function.name} refused (${r.data?.error?.code || r.status}); retrying with tool_choice=auto`);
-        r = await openAiChat(llm.baseUrl, llm.key, llm.model, convo, tools, 'auto');
+      // A required tool the model won't call is a 400 (Groq: tool_use_failed). Often a one-off
+      // generation miss, so try the forced call once more, then let the model choose.
+      for (const retry of [forced, 'auto']) {
+        if (r.ok || !forced || r.status !== 400) break;
+        console.log(`[Tools] forced ${forced.function.name} refused (${r.data?.error?.code || r.status}); retrying with tool_choice=${retry === 'auto' ? 'auto' : 'required'}`);
+        r = await openAiChat(llm.baseUrl, llm.key, llm.model, convo, tools, retry);
       }
       if (!r.ok) {
         console.log(`[Tools] model error body: ${JSON.stringify(r.data).slice(0, 1000)}`);
