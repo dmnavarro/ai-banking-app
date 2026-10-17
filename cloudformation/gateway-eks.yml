@@ -212,7 +212,9 @@ Resources:
     Type: AWS::EKS::Nodegroup
     Properties:
       ClusterName: !Ref Cluster
-      NodegroupName: !Sub "${ClusterName}-nodes"
+      # Instance type in the name: changing it replaces the node group, and CloudFormation creates
+      # the new one (new name) before deleting the old, so pods move instead of going down
+      NodegroupName: !Join ["-", [!Ref ClusterName, !Join ["-", !Split [".", !Ref NodeInstanceType]]]]
       NodeRole: !GetAtt NodeRole.Arn
       Subnets: !Ref SubnetIds
       AmiType: AL2023_x86_64_STANDARD
