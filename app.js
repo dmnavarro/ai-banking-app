@@ -1286,7 +1286,7 @@ function clearConversation() {
 
 // ── NAVIGATION ──
 // The sidebar (desktop) and tab bar (mobile) switch between views in <main>. AI Scanner and
-// File Security are full pages of their own; "Chatbot Assistant" opens the full-screen demo
+// File Security are full pages of their own; "AI Gateway" (#assistant) opens the full-screen demo
 // view on desktop and the chat window on a phone.
 const PAGE_VIEWS = { scanner: 'scannerPage', files: 'payBillsPage' };
 var currentView = 'home';   // var: read by syncAppChrome(), which can run before this line
