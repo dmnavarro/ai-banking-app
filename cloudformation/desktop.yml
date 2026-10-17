@@ -1,9 +1,11 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >
   DG Bank — demo desktop for the Laptop Agents use case (M8).
-  An Ubuntu desktop in the ECS stack's VPC, opened in a browser through noVNC over an
-  SSM port-forward. Nothing listens on a public port. Hermes and Open WebUI on it call the
+  An Ubuntu desktop in the ECS stack's VPC, opened in a browser through noVNC.
+  Nothing listens on a public port. Hermes and Open WebUI on it call the
   AI Gateway's internal load balancer with the engineer-laptop virtual key.
+  SEs open it through the DG Bank app (/desktop/), which is the only thing allowed to reach
+  the desktop's noVNC port; admins can also use an SSM port-forward.
   deploy-desktop.sh creates the stack and then installs the software with SSM Run Command.
 
 Parameters:
@@ -15,6 +17,10 @@ Parameters:
   SubnetId:
     Type: AWS::EC2::Subnet::Id
     Description: One of the ECS stack's public subnets (outbound internet for installs)
+
+  AppSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: The ECS instances' security group (ECSInstanceSecurityGroup); only it may reach noVNC
 
   InstanceType:
     Type: String
@@ -54,12 +60,18 @@ Resources:
     Properties:
       Roles: [!Ref DesktopRole]
 
-  # No inbound rules: the desktop is reached only through SSM Session Manager.
+  # One inbound rule: noVNC (6080) from the DG Bank app's instances. Nothing from the internet.
   DesktopSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: DG Bank demo desktop (outbound only)
+      GroupDescription: DG Bank demo desktop (noVNC from the app only)
       VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6080
+          ToPort: 6080
+          SourceSecurityGroupId: !Ref AppSecurityGroupId
+          Description: noVNC, relayed by the DG Bank app at /desktop/
       SecurityGroupEgress:
         - IpProtocol: "-1"
           CidrIp: 0.0.0.0/0
@@ -75,7 +87,7 @@ Resources:
       NetworkInterfaces:
         - DeviceIndex: "0"
           SubnetId: !Ref SubnetId
-          AssociatePublicIpAddress: true      # outbound only; the security group has no inbound rules
+          AssociatePublicIpAddress: true      # outbound only; inbound is limited to the app's security group
           GroupSet: [!Ref DesktopSecurityGroup]
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
@@ -90,3 +102,6 @@ Resources:
 Outputs:
   InstanceId:
     Value: !Ref Desktop
+  DesktopUrl:
+    Description: noVNC inside the VPC (the private IP stays the same across stop and start)
+    Value: !Sub "http://${Desktop.PrivateIp}:6080"

@@ -42,7 +42,7 @@ systemctl enable --now docker
 KEY=$(aws ssm get-parameter --region "$REGION" --name /dgbank/gateway-key-laptop \
   --with-decryption --query Parameter.Value --output text)
 
-# ── VNC on localhost only; noVNC serves it on 127.0.0.1:6080 for the SSM tunnel ──
+# ── VNC on localhost only; noVNC on :6080 for the DG Bank app (the security group admits only the app) ──
 install -d -o "$DEMO_USER" -g "$DEMO_USER" "$DEMO_HOME/.vnc"
 cat > "$DEMO_HOME/.vnc/xstartup" <<'EOF'
 #!/bin/sh
@@ -53,8 +53,8 @@ EOF
 chmod 755 "$DEMO_HOME/.vnc/xstartup"
 chown "$DEMO_USER:$DEMO_USER" "$DEMO_HOME/.vnc/xstartup"
 
-# No VNC password: the server listens on localhost only and is reachable only through
-# an SSM port-forward, which needs AWS credentials for this account.
+# No VNC password: VNC listens on localhost only. noVNC (6080) is reachable only from the DG Bank
+# app's security group, and the app asks for the access code before it relays anything.
 cat > /etc/systemd/system/demo-vnc.service <<EOF
 [Unit]
 Description=Demo desktop (TigerVNC :1)
@@ -78,7 +78,7 @@ After=demo-vnc.service
 Requires=demo-vnc.service
 
 [Service]
-ExecStart=/usr/bin/websockify --web=/usr/share/novnc/ 127.0.0.1:6080 127.0.0.1:5901
+ExecStart=/usr/bin/websockify --web=/usr/share/novnc/ 0.0.0.0:6080 127.0.0.1:5901
 Restart=on-failure
 
 [Install]
@@ -152,9 +152,44 @@ for f in "$DESK"/*.desktop; do
   sudo -u "$DEMO_USER" dbus-launch gio set "$f" metadata::trusted true 2>/dev/null || true
 done
 
+# ── Stop the instance after 60 idle minutes (no one connected to noVNC) ──────
+cat > /usr/local/bin/demo-idle-stop <<'IDLE'
+#!/bin/bash
+# Runs every 5 minutes. A connection to :6080 resets the clock; the clock also starts at boot.
+STAMP=/run/demo-last-active
+IDLE_MINUTES=60
+[[ -f $STAMP ]] || touch $STAMP
+if [[ -n "$(ss -Htn state established '( sport = :6080 )')" ]]; then touch $STAMP; exit 0; fi
+if [[ $(( ($(date +%s) - $(stat -c %Y $STAMP)) / 60 )) -ge $IDLE_MINUTES ]]; then
+  logger "demo desktop idle for $IDLE_MINUTES minutes, stopping"
+  shutdown -h now        # the instance's shutdown behaviour is stop, so it can be started again
+fi
+IDLE
+chmod 755 /usr/local/bin/demo-idle-stop
+cat > /etc/systemd/system/demo-idle-stop.service <<'IDLE'
+[Unit]
+Description=Stop the demo desktop when idle
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/demo-idle-stop
+IDLE
+cat > /etc/systemd/system/demo-idle-stop.timer <<'IDLE'
+[Unit]
+Description=Check every 5 minutes whether the demo desktop is idle
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+IDLE
+
 systemctl daemon-reload
 systemctl enable demo-vnc.service demo-novnc.service
 systemctl restart demo-vnc.service demo-novnc.service
+systemctl enable --now demo-idle-stop.timer
 
 # ── Self-check: the gateway answers with the engineer-laptop key ─────────────
 log "Checking the gateway as engineer-laptop..."

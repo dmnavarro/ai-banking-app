@@ -1316,6 +1316,7 @@ function showView(name) {
   if (name === 'scanner') prepareScanner();
   if (name === 'files' && leaving !== 'files') resetPbState();
   if (name === 'settings') loadSettingsUI();
+  if (name === 'agents') refreshDesktop();
 
   currentView = name;
   markNav(name);
@@ -1369,6 +1370,62 @@ async function runPreflight() {
     list.innerHTML = `<li class="bad"><span class="pf-mark">✕</span><div><b>${escHtml(t('pf.unreachable'))}</b><span>${escHtml(e.message)}</span></div></li>`;
   }
   btn.disabled = false;
+}
+
+// ── Laptop Agents demo desktop (M8): the app relays it at /desktop/ and can start it ──
+let deskTimer = null;
+async function refreshDesktop() {
+  clearTimeout(deskTimer);
+  if (currentView !== 'agents' && document.querySelector('.view[data-view="agents"]').hidden) return;
+  const el = id => document.getElementById(id);
+  let st;
+  try { st = await (await fetch('/api/desktop/status')).json(); }
+  catch { st = { configured: true, state: 'unknown' }; }
+  const show = (id, on) => { el(id).hidden = !on; };
+  let label, note, poll = 0;
+  if (!st.configured) {
+    label = 'Not set up';
+    note = 'The demo desktop is not connected to this site yet (deploy-desktop.sh, then deploy-ecs.sh).';
+  } else if (st.ready) {
+    label = 'Ready';
+    note = st.sessions ? `${st.sessions} connected now: another SE may be presenting.` : 'Nobody connected. It stops itself after an hour unused.';
+    poll = 15000;
+  } else if (st.state === 'running' || st.state === 'pending') {
+    label = 'Starting…'; note = 'Usually ready about 2 minutes after starting.'; poll = 5000;
+  } else if (st.state === 'stopping') {
+    label = 'Stopping'; note = 'It stopped after an hour unused. Start it again in a minute.'; poll = 5000;
+  } else if (st.state === 'stopped') {
+    label = 'Stopped'; note = 'Start it a few minutes before the demo.';
+  } else {
+    label = 'Unavailable'; note = st.error || 'Could not read the desktop status.'; poll = 15000;
+  }
+  el('deskState').textContent = label;
+  el('deskNote').textContent = note;
+  el('deskDot').classList.toggle('on', !!st.ready);
+  show('deskUnlock', st.configured && !st.unlocked);
+  show('deskStart', st.configured && st.unlocked && st.state === 'stopped');
+  show('deskOpen', st.configured && st.unlocked && st.ready);
+  if (poll) deskTimer = setTimeout(refreshDesktop, poll);
+}
+
+async function unlockDesktop() {
+  const err = document.getElementById('deskError');
+  err.hidden = true;
+  const r = await fetch('/api/desktop/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: document.getElementById('deskCode').value }) });
+  if (!r.ok) { err.textContent = (await r.json().catch(() => ({}))).error || `HTTP ${r.status}`; err.hidden = false; return; }
+  document.getElementById('deskCode').value = '';
+  refreshDesktop();
+}
+
+async function startDesktop() {
+  const err = document.getElementById('deskError');
+  err.hidden = true;
+  document.getElementById('deskStart').disabled = true;
+  const r = await fetch('/api/desktop/start', { method: 'POST' });
+  document.getElementById('deskStart').disabled = false;
+  if (!r.ok) { err.textContent = (await r.json().catch(() => ({}))).error || `HTTP ${r.status}`; err.hidden = false; }
+  setTimeout(refreshDesktop, 1500);
 }
 
 // ── AI Scanner before/after (M7): the same app scanned direct, then through the gateway ──

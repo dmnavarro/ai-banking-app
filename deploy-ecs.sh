@@ -29,6 +29,8 @@ DIRECT_LLM_URL=""
 DIRECT_LLM_MODEL=""
 MCP_URL=""
 GATEWAY_MCP_URL=""
+DESKTOP_INSTANCE_ID=""
+DESKTOP_URL=""
 
 usage() {
   cat <<EOF
@@ -49,6 +51,8 @@ Optional:
   --direct-llm-model Model ID for --direct-llm-url, e.g. openai/gpt-oss-120b
   --mcp-url          DG Bank MCP server URL for tools without the gateway (from deploy-gateway.sh --deploy-mcp)
   --gateway-mcp-url  AI Gateway MCP Connect URL for the dgbank-mcp upstream (from the console)
+  --desktop-instance-id / --desktop-url
+                     Laptop Agents demo desktop, relayed at /desktop/ (printed by deploy-desktop.sh)
   --skip-oidc        Skip GitHub OIDC provider creation if it already exists
   --stack-name       CloudFormation stack name (default: dgbank-ai-app-demo-ecs)
   --help             Show this help
@@ -70,6 +74,8 @@ while [[ $# -gt 0 ]]; do
     --direct-llm-model) DIRECT_LLM_MODEL="$2"; shift 2 ;;
     --mcp-url)         MCP_URL="$2";           shift 2 ;;
     --gateway-mcp-url) GATEWAY_MCP_URL="$2";   shift 2 ;;
+    --desktop-instance-id) DESKTOP_INSTANCE_ID="$2"; shift 2 ;;
+    --desktop-url)     DESKTOP_URL="$2";       shift 2 ;;
     --skip-oidc)       CREATE_OIDC="false";    shift ;;
     --stack-name)      STACK_NAME="$2";        shift 2 ;;
     --help)            usage ;;
@@ -166,6 +172,19 @@ if [[ -n "$MCP_URL" ]]; then
   echo ""
 fi
 
+if [[ -n "$DESKTOP_INSTANCE_ID" ]]; then
+  if [[ -z "$DESKTOP_URL" ]]; then
+    echo "Error: --desktop-url is required with --desktop-instance-id"
+    exit 1
+  fi
+  if ! aws ssm get-parameter --name /dgbank/desktop-access-code --region "$REGION" > /dev/null 2>&1; then
+    echo "Error: SSM parameter /dgbank/desktop-access-code not found. Run ./deploy-desktop.sh first — it creates it."
+    exit 1
+  fi
+  echo "Desktop     : $DESKTOP_INSTANCE_ID at $DESKTOP_URL (access code found in SSM)"
+  echo ""
+fi
+
 # ---------------------------------------------------------------------------
 # Step 1 — Ensure ECR repository exists
 # ---------------------------------------------------------------------------
@@ -213,6 +232,7 @@ GATEWAY_OVERRIDE=()
 [[ -n "$DIRECT_LLM_URL" ]] && GATEWAY_OVERRIDE+=(DirectLlmBaseUrl="$DIRECT_LLM_URL" DirectLlmModel="$DIRECT_LLM_MODEL")
 [[ -n "$MCP_URL" ]] && GATEWAY_OVERRIDE+=(McpDirectUrl="$MCP_URL")
 [[ -n "$GATEWAY_MCP_URL" ]] && GATEWAY_OVERRIDE+=(GatewayMcpUrl="$GATEWAY_MCP_URL")
+[[ -n "$DESKTOP_INSTANCE_ID" ]] && GATEWAY_OVERRIDE+=(DesktopInstanceId="$DESKTOP_INSTANCE_ID" DesktopUrl="$DESKTOP_URL")
 
 echo "Deploying CloudFormation stack: $STACK_NAME ..."
 aws cloudformation deploy \

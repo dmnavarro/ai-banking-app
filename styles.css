@@ -1941,3 +1941,11 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .agent-steps { padding-left: 1.2rem; display: flex; flex-direction: column; gap: .5rem; font-size: .92rem; color: #4A3236; }
 .agent-steps code, .check-points code { font-size: .82rem; }
 .agent-links { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+.desk-card { margin-bottom: 1.25rem; }
+.desk-card .agent-links { margin-top: .75rem; }
+.desk-state { display: inline-flex; align-items: center; font-size: .9rem; color: #4A3236; }
+.desk-state .pdot { background: #D9C7C9; }
+.desk-unlock { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .6rem; }
+.desk-unlock .sc-input { max-width: 260px; }
+.desk-error { margin-top: .5rem; color: var(--bad-fg); font-size: .85rem; }
+a.btn-primary { text-decoration: none; display: inline-flex; align-items: center; }

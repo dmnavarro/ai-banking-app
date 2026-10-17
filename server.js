@@ -9,6 +9,7 @@ const { Client: McpClient } = require('@modelcontextprotocol/sdk/client/index.js
 const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
 
 const app = express();
+app.set('trust proxy', 1);  // behind the ALB: req.ip and req.secure come from X-Forwarded-*
 app.use(express.json({ limit: '15mb' })); // SDK mode sends files as base64 (~33% overhead over 10MB limit)
 app.use(express.static(__dirname));
 
@@ -973,6 +974,144 @@ app.get('/api/gateway/health', async (_req, res) => {
   res.json({ ok: results.every(c => c.ok), at: new Date().toISOString(), checks: results });
 });
 
+// ── Laptop Agents demo desktop (M8) ──
+// The desktop (deploy-desktop.sh) has no public address. SEs open it through this app: /desktop/ relays
+// noVNC's pages and its WebSocket over the VPC, after the access code has been entered once.
+// The app may start the instance; the desktop stops itself after 60 idle minutes.
+const http   = require('http');
+const net    = require('net');
+const crypto = require('crypto');
+const { EC2Client, DescribeInstancesCommand, StartInstancesCommand } = require('@aws-sdk/client-ec2');
+
+const DESKTOP_INSTANCE_ID = (process.env.DESKTOP_INSTANCE_ID || '').trim();
+const DESKTOP_URL         = (process.env.DESKTOP_URL || '').trim();
+const DESKTOP_ACCESS_CODE = (process.env.DESKTOP_ACCESS_CODE || '').trim();
+const desktopTarget = DESKTOP_URL && DESKTOP_ACCESS_CODE ? new URL(DESKTOP_URL) : null;
+const ec2Client     = DESKTOP_INSTANCE_ID ? new EC2Client({ region: process.env.AWS_REGION || BEDROCK_REGION }) : null;
+const DESKTOP_COOKIE = 'dg_desktop';
+// The cookie holds a hash of the code, so changing the code (--rotate-code) signs everyone out
+const desktopToken = DESKTOP_ACCESS_CODE
+  ? crypto.createHmac('sha256', DESKTOP_ACCESS_CODE).update('dgbank-desktop').digest('hex') : '';
+const DESKTOP_PAGE = '/desktop/vnc.html?autoconnect=1&resize=scale&path=desktop/websockify';
+let desktopSessions = 0;
+
+function hasDesktopAccess(req) {
+  const m = (req.headers.cookie || '').match(new RegExp(`(?:^|;\\s*)${DESKTOP_COOKIE}=([a-f0-9]{64})`));
+  return !!(m && desktopToken && crypto.timingSafeEqual(Buffer.from(m[1]), Buffer.from(desktopToken)));
+}
+
+// A few wrong codes per address, then a 15-minute pause
+const unlockAttempts = new Map();
+function unlockAllowed(ip) {
+  const now = Date.now();
+  const a = unlockAttempts.get(ip);
+  if (!a || now - a.since > 15 * 60000) { unlockAttempts.set(ip, { since: now, n: 1 }); return true; }
+  return ++a.n <= 10;
+}
+
+function probeDesktop() {
+  return new Promise(resolve => {
+    const r = http.get({ hostname: desktopTarget.hostname, port: desktopTarget.port, path: '/vnc.html', timeout: 2000 },
+      res => { res.resume(); resolve(res.statusCode === 200); });
+    r.on('timeout', () => { r.destroy(); resolve(false); });
+    r.on('error', () => resolve(false));
+  });
+}
+
+app.get('/api/desktop/status', async (req, res) => {
+  if (!desktopTarget || !ec2Client) return res.json({ configured: false });
+  const unlocked = hasDesktopAccess(req);
+  try {
+    const d = await ec2Client.send(new DescribeInstancesCommand({ InstanceIds: [DESKTOP_INSTANCE_ID] }));
+    const state = d.Reservations?.[0]?.Instances?.[0]?.State?.Name || 'unknown';
+    const ready = state === 'running' && await probeDesktop();
+    res.json({ configured: true, unlocked, state, ready, sessions: desktopSessions });
+  } catch (e) {
+    console.error('[Desktop] status:', e.message);
+    res.json({ configured: true, unlocked, state: 'unknown', ready: false, error: e.message });
+  }
+});
+
+app.post('/api/desktop/unlock', (req, res) => {
+  if (!desktopTarget) return res.status(404).json({ error: 'The demo desktop is not set up on this server.' });
+  if (!unlockAllowed(req.ip)) return res.status(429).json({ error: 'Too many attempts. Try again in 15 minutes.' });
+  const code = String(req.body?.code || '').trim();
+  const ok = code.length === DESKTOP_ACCESS_CODE.length &&
+    crypto.timingSafeEqual(Buffer.from(code), Buffer.from(DESKTOP_ACCESS_CODE));
+  if (!ok) return res.status(403).json({ error: 'That access code is not right.' });
+  const secure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+  res.setHeader('Set-Cookie',
+    `${DESKTOP_COOKIE}=${desktopToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200${secure ? '; Secure' : ''}`);
+  console.log('[Desktop] unlocked');
+  res.json({ ok: true });
+});
+
+app.post('/api/desktop/start', async (req, res) => {
+  if (!desktopTarget || !ec2Client) return res.status(404).json({ error: 'The demo desktop is not set up on this server.' });
+  if (!hasDesktopAccess(req)) return res.status(403).json({ error: 'Enter the access code first.' });
+  try {
+    await ec2Client.send(new StartInstancesCommand({ InstanceIds: [DESKTOP_INSTANCE_ID] }));
+    console.log('[Desktop] start requested');
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[Desktop] start:', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// noVNC's pages and scripts (GET only)
+app.use('/desktop', (req, res) => {
+  if (!desktopTarget) return res.status(404).send('The demo desktop is not set up on this server.');
+  if (!hasDesktopAccess(req)) return res.redirect('/#agents');
+  if (req.path === '/') return res.redirect(DESKTOP_PAGE);
+  const upstream = http.request({
+    hostname: desktopTarget.hostname, port: desktopTarget.port, method: 'GET', path: req.url, timeout: 10000,
+    headers: { accept: req.headers.accept || '*/*' },
+  }, r => {
+    res.status(r.statusCode);
+    for (const h of ['content-type', 'content-length', 'last-modified', 'etag']) if (r.headers[h]) res.setHeader(h, r.headers[h]);
+    r.pipe(res);
+  });
+  const fail = () => { if (!res.headersSent) res.status(502).send('The demo desktop is not running. Start it from the Laptop Agents page.'); };
+  upstream.on('timeout', () => { upstream.destroy(); fail(); });
+  upstream.on('error', fail);
+  upstream.end();
+});
+
+// noVNC's screen: a WebSocket at /desktop/websockify, piped to websockify on the desktop
+function desktopUpgrade(req, socket, head) {
+  if (!desktopTarget || !req.url.startsWith('/desktop/websockify') || !hasDesktopAccess(req)) {
+    socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
+    return;
+  }
+  let counted = false;
+  const upstream = net.connect(Number(desktopTarget.port), desktopTarget.hostname, () => {
+    const lines = [`GET /websockify HTTP/1.1`];
+    for (let i = 0; i < req.rawHeaders.length; i += 2) {
+      const [k, v] = [req.rawHeaders[i], req.rawHeaders[i + 1]];
+      if (/^(host|cookie)$/i.test(k)) continue;   // the access cookie stays here
+      lines.push(`${k}: ${v}`);
+    }
+    lines.push(`Host: ${desktopTarget.host}`);
+    upstream.write(lines.join('\r\n') + '\r\n\r\n');
+    if (head?.length) upstream.write(head);
+    socket.pipe(upstream).pipe(socket);
+    counted = true;
+    desktopSessions++;
+    console.log(`[Desktop] session opened (${desktopSessions} connected)`);
+  });
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    if (counted) desktopSessions--;
+    socket.destroy(); upstream.destroy();
+  };
+  upstream.setTimeout(0);
+  upstream.on('error', close); upstream.on('close', close);
+  socket.on('error', close);   socket.on('close', close);
+}
+
 // Serve the app at root
 // Asset URLs carry the start-up time, so a new page never pairs with a cached older styles.css or app.js
 const ASSET_VERSION = Date.now().toString(36);
@@ -992,6 +1131,7 @@ const server = app.listen(PORT, () => {
     console.log(`  TMAS: not found (${e.message})`);
   }
 });
+server.on('upgrade', desktopUpgrade);
 
 // Graceful shutdown — lets ECS drain connections quickly on SIGTERM
 process.on('SIGTERM', () => {

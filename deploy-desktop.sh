@@ -4,20 +4,25 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # DG Bank — demo desktop for the Laptop Agents use case (M8)
 # Usage: ./deploy-desktop.sh [options]             # create/update the desktop and install the software
-#        ./deploy-desktop.sh --connect            # open the SSM tunnel; then browse to the printed URL
 #        ./deploy-desktop.sh --setup              # re-run the software setup (e.g. after a key change)
-#        ./deploy-desktop.sh --start | --stop     # start or stop the instance between demos
+#        ./deploy-desktop.sh --show-code          # print the access code SEs type in the app
+#        ./deploy-desktop.sh --rotate-code        # new access code (then re-run deploy-ecs.sh)
+#        ./deploy-desktop.sh --start | --stop     # start or stop the instance
+#        ./deploy-desktop.sh --connect            # admin fallback: SSM tunnel to localhost:6080
 #        ./deploy-desktop.sh --delete             # remove the desktop
 #
 # What the default run does (in order):
 #   1. Check the engineer-laptop virtual key exists in SSM (/dgbank/gateway-key-laptop)
+#      and create the desktop access code (/dgbank/desktop-access-code) if there is none
 #   2. Read the gateway URLs from the ECS stack (GatewayBaseUrl, GatewayMcpUrl)
-#   3. Deploy CloudFormation stack (EC2 instance in the ECS stack's VPC, no inbound ports)
+#   3. Deploy CloudFormation stack (EC2 instance in the ECS stack's VPC; noVNC open only
+#      to the app's security group)
 #   4. Wait for the SSM agent, then run desktop/setup.sh on the instance with Run Command:
 #      XFCE + TigerVNC + noVNC, Chrome, Open WebUI and Hermes Agent, both using the gateway
+#   5. Print the deploy-ecs.sh command that lets the app relay the desktop at /desktop/
 #
-# The desktop is reached only through an SSM port-forward (needs the Session Manager
-# plugin for the AWS CLI on your machine).
+# SEs open the desktop from the app's Laptop Agents page with the access code; the app
+# starts the instance on request and the desktop stops itself after 60 idle minutes.
 # ---------------------------------------------------------------------------
 
 STACK_NAME="dgbank-demo-desktop"
@@ -36,9 +41,11 @@ Usage: $0 [--connect | --setup | --start | --stop | --delete] [options]
 
 Modes:
   (default)            Create or update the desktop and install its software
-  --connect            Open the SSM tunnel to the desktop (leave it running during the demo)
   --setup              Re-run the software setup on the existing desktop
+  --show-code          Print the access code SEs type before the desktop opens
+  --rotate-code        Create a new access code (then re-run deploy-ecs.sh so the app picks it up)
   --start / --stop     Start or stop the instance (stopped = no compute cost)
+  --connect            Admin fallback: SSM tunnel to the desktop's noVNC on localhost
   --delete             Delete the desktop stack
 
 Optional:
@@ -59,6 +66,8 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --connect)         MODE="connect";            shift ;;
     --setup)           MODE="setup";              shift ;;
+    --show-code)       MODE="show-code";          shift ;;
+    --rotate-code)     MODE="rotate-code";        shift ;;
     --start)           MODE="start";              shift ;;
     --stop)            MODE="stop";               shift ;;
     --delete)          MODE="delete";             shift ;;
@@ -160,11 +169,29 @@ run_setup() {
   fi
 }
 
+stack_output() {
+  aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" \
+    --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+}
+
+new_code() {
+  # 12 characters without look-alikes (0/O, 1/l/I), easy to read out on a call
+  LC_ALL=C tr -dc 'abcdefghjkmnpqrstuvwxyz23456789' < /dev/urandom | head -c 12
+}
+
+show_code() {
+  aws ssm get-parameter --region "$REGION" --name /dgbank/desktop-access-code \
+    --with-decryption --query Parameter.Value --output text
+}
+
 print_connect() {
+  local id url
+  id=$(instance_id); url=$(stack_output DesktopUrl)
   echo ""
-  echo "Open the desktop:"
-  echo "  ./deploy-desktop.sh --connect      (leave it running)"
-  echo "  then browse to http://localhost:${LOCAL_PORT}/vnc.html?autoconnect=1&resize=scale"
+  echo "Let the app relay the desktop (once, and again after --rotate-code):"
+  echo "  ./deploy-ecs.sh --desktop-instance-id $id --desktop-url $url"
+  echo ""
+  echo "SEs: Laptop Agents page → Open demo desktop, access code: $(show_code)"
 }
 
 case "$MODE" in
@@ -197,11 +224,22 @@ case "$MODE" in
     fi
     exit 0
     ;;
+  show-code)
+    show_code
+    exit 0
+    ;;
+  rotate-code)
+    aws ssm put-parameter --region "$REGION" --name /dgbank/desktop-access-code \
+      --type SecureString --overwrite --value "$(new_code)" > /dev/null
+    echo "New access code: $(show_code)"
+    echo "Re-run ./deploy-ecs.sh (no flags needed) so the app picks it up."
+    exit 0
+    ;;
   delete)
     echo "Deleting stack $STACK_NAME..."
     aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION"
     aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$REGION"
-    echo "Deleted. The SSM parameter /dgbank/gateway-key-laptop is kept."
+    echo "Deleted. The SSM parameters /dgbank/gateway-key-laptop and /dgbank/desktop-access-code are kept."
     exit 0
     ;;
   setup)
@@ -224,9 +262,17 @@ if ! aws ssm get-parameter --name /dgbank/gateway-key-laptop --region "$REGION" 
   exit 1
 fi
 
+if ! aws ssm get-parameter --name /dgbank/desktop-access-code --region "$REGION" > /dev/null 2>&1; then
+  aws ssm put-parameter --region "$REGION" --name /dgbank/desktop-access-code \
+    --type SecureString --value "$(new_code)" > /dev/null
+  echo "Created the desktop access code (/dgbank/desktop-access-code)."
+fi
+
 VPC_ID=$(aws cloudformation describe-stack-resource --stack-name "$ECS_STACK" --logical-resource-id VPC \
   --region "$REGION" --query StackResourceDetail.PhysicalResourceId --output text)
 SUBNET_ID=$(aws cloudformation describe-stack-resource --stack-name "$ECS_STACK" --logical-resource-id PublicSubnetA \
+  --region "$REGION" --query StackResourceDetail.PhysicalResourceId --output text)
+APP_SG_ID=$(aws cloudformation describe-stack-resource --stack-name "$ECS_STACK" --logical-resource-id ECSInstanceSecurityGroup \
   --region "$REGION" --query StackResourceDetail.PhysicalResourceId --output text)
 
 echo "Region      : $REGION"
@@ -240,7 +286,7 @@ aws cloudformation deploy \
   --region "$REGION" \
   --capabilities CAPABILITY_IAM \
   --no-fail-on-empty-changeset \
-  --parameter-overrides VpcId="$VPC_ID" SubnetId="$SUBNET_ID" InstanceType="$INSTANCE_TYPE"
+  --parameter-overrides VpcId="$VPC_ID" SubnetId="$SUBNET_ID" AppSecurityGroupId="$APP_SG_ID" InstanceType="$INSTANCE_TYPE"
 
 ID=$(instance_id)
 echo "Instance    : $ID"

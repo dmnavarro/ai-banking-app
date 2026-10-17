@@ -113,7 +113,7 @@ The gateway itself is installed by hand with the Helm command the Vision One con
 
 ### `deploy-desktop.sh` — Laptop agents demo desktop (CloudFormation: `cloudformation/desktop.yml`)
 
-Optional (M8). One EC2 instance in the ECS stack's public subnet: Ubuntu 24.04, t3.large, 40 GB encrypted gp3, IMDSv2 only, a security group with **no inbound rules**, and an instance role limited to SSM plus reading `/dgbank/gateway-key-laptop`. The software (`desktop/setup.sh`: XFCE, TigerVNC and noVNC on localhost, Chrome, Open WebUI in Docker, Hermes Agent) is installed with SSM Run Command.
+Optional (M8). One EC2 instance in the ECS stack's public subnet: Ubuntu 24.04, t3.large, 40 GB encrypted gp3, IMDSv2 only, a security group that admits only the app's instances (noVNC, port 6080), and an instance role limited to SSM plus reading `/dgbank/gateway-key-laptop`. It stops itself after 60 idle minutes. The software (`desktop/setup.sh`: XFCE, TigerVNC and noVNC on localhost, Chrome, Open WebUI in Docker, Hermes Agent) is installed with SSM Run Command.
 
 ---
 
@@ -128,7 +128,6 @@ Optional (M8). One EC2 instance in the ECS stack's public subnet: Ubuntu 24.04, 
 | Amazon Bedrock model access | In the AWS console → Bedrock → Model access, switch region to **us-east-1** and enable **DeepSeek-R1**. DeepSeek-R1 isn't available in-region in us-east-1 — the app invokes it via the `us.deepseek.r1-v1:0` cross-region inference profile, which routes to us-east-1/us-east-2/us-west-2. The chatbot runs in us-east-1 regardless of where ECS is deployed. |
 | (Optional) ACM certificate | For HTTPS — request a wildcard cert in ACM before running the deploy script |
 | (AI Gateway only) kubectl, Helm, jq | Needed by `deploy-gateway.sh` and the console's Helm command |
-| (Laptop agents only) Session Manager plugin | For `deploy-desktop.sh --connect` ([install](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html)) |
 
 ---
 
@@ -485,7 +484,7 @@ The new transactions are in the MCP server's data, so redeploy it once: `./deplo
 
 ### Laptop agents demo desktop (M8)
 
-The **Laptop Agents** page shows the fourth use case: an engineer's own AI agent going through the same gateway. `deploy-desktop.sh` builds an Ubuntu desktop in the ECS stack's VPC (t3.large) that you open in a browser. It has no inbound ports: you reach it through an SSM port-forward. On it:
+The **Laptop Agents** page shows the fourth use case: an engineer's own AI agent going through the same gateway. `deploy-desktop.sh` builds an Ubuntu desktop in the ECS stack's VPC (t3.large). SEs open it from the Laptop Agents page with an access code: the DG Bank app relays it at `/desktop/`, so they need no AWS access. The desktop has no public address; only the app's security group can reach it. On it:
 
 - **Hermes Agent** (terminal), with the gateway as its model provider (`dgbank-chat`) and the `dgbank-mcp` tools through the gateway's MCP Connect URL.
 - **DG Bank Engineering Chat**: Open WebUI, a ChatGPT-style app whose only model provider is the gateway.
@@ -507,15 +506,19 @@ aws ssm put-parameter --region ap-southeast-1 --type SecureString \
 ./deploy-desktop.sh            # 10–15 minutes the first time; ends with a test call as engineer-laptop
 ```
 
-**3. Open it** (needs the [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) for the AWS CLI):
+The script also creates an access code (`/dgbank/desktop-access-code`) and ends by printing it and the next command.
+
+**3. Connect it to the app** (the command the script printed):
 
 ```bash
-./deploy-desktop.sh --connect  # leave it running
+./deploy-ecs.sh --desktop-instance-id <i-...> --desktop-url http://<private-ip>:6080
 ```
 
-Then browse to <http://localhost:6080/vnc.html?autoconnect=1&resize=scale>, or click **Open demo desktop** on the Laptop Agents page. The page lists the demo prompts.
+This passes the desktop and the access code to the app, lets the app start that one instance, and raises the load balancer's idle timeout to an hour so a quiet desktop screen stays connected.
 
-Between demos, `./deploy-desktop.sh --stop` (no compute cost while stopped) and `--start`. After rotating the key, update the SSM parameter and run `./deploy-desktop.sh --setup`. `--delete` removes the desktop.
+**4. What SEs do.** Laptop Agents page → enter the access code once (remembered for 12 hours) → **Start desktop** if it is stopped (about 2 minutes) → **Open demo desktop**. The page shows when someone is already connected: there is one shared desktop. After 60 minutes with nobody connected the desktop stops itself, so it costs nothing between demos.
+
+**Admin commands:** `./deploy-desktop.sh --show-code` prints the code; `--rotate-code` makes a new one (then run `./deploy-ecs.sh` so the app picks it up; everyone has to enter the new code). After rotating the gateway key, update its SSM parameter and run `--setup`. `--start` / `--stop` work from the CLI too, `--connect` is an SSM tunnel for admins (needs the [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html)), and `--delete` removes the desktop.
 
 > **To verify on the first run.** Hermes's config file format (`~/.hermes/config.yaml`: `model.provider: custom`, `base_url`, `api_key`, `default`; `mcp_servers.dgbank.url` + `headers`) was taken from its documentation, not tested here. If Hermes asks for a provider on first start, run `hermes model` on the desktop and choose the custom endpoint. If Open WebUI shows no models, add `dgbank-chat` under **Admin → Settings → Connections**.
 
@@ -765,6 +768,7 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | `--direct-llm-model` | *(unchanged)* | Model for `--direct-llm-url`, e.g. `openai/gpt-oss-120b` |
 | `--mcp-url` | *(unchanged)* | DG Bank MCP server URL for tools without the gateway; needs SSM `/dgbank/mcp-token` |
 | `--gateway-mcp-url` | *(unchanged)* | AI Gateway MCP Connect URL for the `dgbank-mcp` upstream |
+| `--desktop-instance-id` / `--desktop-url` | *(unchanged)* | Laptop Agents demo desktop the app relays at `/desktop/` (printed by `deploy-desktop.sh`); needs `/dgbank/desktop-access-code` |
 | `--skip-oidc` | *(off)* | Skip OIDC provider creation when it already exists. Re-runs keep the stack's setting, as they do for every option left out |
 | `--stack-name` | `dgbank-ai-app-demo-ecs` | CloudFormation stack name |
 
@@ -800,8 +804,9 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | Mode / option | Default | Description |
 |---|---|---|
 | *(none)* | | Create or update the demo desktop and install its software |
-| `--connect` | | SSM port-forward to the desktop's noVNC (`localhost:6080`) |
 | `--setup` | | Re-run the software setup (after a key change) |
+| `--show-code` / `--rotate-code` | | Print or replace the access code SEs type in the app |
+| `--connect` | | Admin fallback: SSM port-forward to the desktop's noVNC (`localhost:6080`) |
 | `--start` / `--stop` | | Start or stop the instance |
 | `--delete` | | Delete the desktop stack |
 | `--instance-type` | `t3.large` | `t3.large`, `t3.xlarge` or `m7i.large` |

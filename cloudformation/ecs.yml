@@ -75,6 +75,18 @@ Parameters:
     Default: ""
     Description: AI Gateway MCP Connect URL for the dgbank-mcp upstream (from the console), used for tools in Gateway mode
 
+  DesktopInstanceId:
+    Type: String
+    Default: ""
+    Description: >
+      Laptop Agents demo desktop (deploy-desktop.sh). The app relays the desktop at /desktop/ and
+      may start this one instance. When set, the SSM parameter /dgbank/desktop-access-code must exist.
+
+  DesktopUrl:
+    Type: String
+    Default: ""
+    Description: noVNC address of the demo desktop inside the VPC, e.g. http://10.0.1.25:6080
+
 
 Conditions:
   ShouldCreateOIDC: !Equals [!Ref CreateOIDCProvider, "true"]
@@ -83,6 +95,7 @@ Conditions:
   HasDirectLlm: !Not [!Equals [!Ref DirectLlmBaseUrl, ""]]
   HasMcpDirect: !Not [!Equals [!Ref McpDirectUrl, ""]]
   HasGatewayMcp: !Not [!Equals [!Ref GatewayMcpUrl, ""]]
+  HasDesktop: !Not [!Equals [!Ref DesktopInstanceId, ""]]
 
 Resources:
 
@@ -462,6 +475,22 @@ Resources:
                 Action:
                   - s3:ListBucket
                 Resource: !Sub "arn:aws:s3:::dg-bank-scanning-${AWS::AccountId}-${AWS::Region}"
+        # SEs start the Laptop Agents desktop from the app; it stops itself when idle
+        - !If
+          - HasDesktop
+          - PolicyName: dgbank-ai-app-demo-desktop-start
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Sid: StartDemoDesktop
+                  Effect: Allow
+                  Action: ec2:StartInstances
+                  Resource: !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${DesktopInstanceId}"
+                - Sid: DescribeDemoDesktop
+                  Effect: Allow
+                  Action: ec2:DescribeInstances
+                  Resource: "*"
+          - !Ref AWS::NoValue
 
   # ---------------------------------------------------------------------------
   # IAM — EC2 Instance Role (ECS agent + ECR + SSM)
@@ -592,6 +621,16 @@ Resources:
               - Name: GATEWAY_MCP_URL
                 Value: !Ref GatewayMcpUrl
               - !Ref AWS::NoValue
+            - !If
+              - HasDesktop
+              - Name: DESKTOP_INSTANCE_ID
+                Value: !Ref DesktopInstanceId
+              - !Ref AWS::NoValue
+            - !If
+              - HasDesktop
+              - Name: DESKTOP_URL
+                Value: !Ref DesktopUrl
+              - !Ref AWS::NoValue
           Secrets:
             - Name: TMAS_API_KEY
               ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/tmas-api-key"
@@ -618,6 +657,12 @@ Resources:
               - Name: MCP_TOKEN
                 ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/mcp-token"
               - !Ref AWS::NoValue
+            # Access code SEs type before the demo desktop opens (written by deploy-desktop.sh)
+            - !If
+              - HasDesktop
+              - Name: DESKTOP_ACCESS_CODE
+                ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dgbank/desktop-access-code"
+              - !Ref AWS::NoValue
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -639,6 +684,10 @@ Resources:
         - !Ref PublicSubnetB
       SecurityGroups:
         - !Ref ALBSecurityGroup
+      LoadBalancerAttributes:
+        # The demo desktop's screen is a long-lived WebSocket that can sit quiet for minutes
+        - Key: idle_timeout.timeout_seconds
+          Value: "3600"
 
   ALBTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup

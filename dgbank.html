@@ -341,6 +341,21 @@
   <section class="view" data-view="agents" hidden>
     <header class="page-head"><div><h1>AI agents on laptops</h1><p class="page-sub">Engineers run AI agents on their own machines. Pointed at the AI Gateway, those agents get the same guardrails, access rules and logs as the DG Bank chatbot.</p></div>
       <span class="tag">Demo desktop</span></header>
+    <div class="panel-card desk-card">
+      <div class="panel-title-row"><h2>Demo desktop</h2>
+        <span class="desk-state"><span class="pdot" id="deskDot"></span><b id="deskState">Checking…</b></span></div>
+      <p class="muted" id="deskNote">An engineer's desktop in the cloud, opened in your browser. It stops itself after an hour unused.</p>
+      <div class="desk-unlock" id="deskUnlock" hidden>
+        <input class="sc-input" id="deskCode" type="password" placeholder="Access code" autocomplete="off" onkeydown="if(event.key==='Enter')unlockDesktop()">
+        <button class="btn-primary" onclick="unlockDesktop()">Unlock</button>
+      </div>
+      <p class="desk-error" id="deskError" hidden></p>
+      <div class="agent-links">
+        <button class="btn-primary" id="deskStart" onclick="startDesktop()" hidden>Start desktop</button>
+        <a class="btn-primary" id="deskOpen" href="/desktop/" target="_blank" rel="noopener" hidden>Open demo desktop ↗</a>
+        <a class="btn-ghost" id="agentsEventsLink" href="#" target="_blank" rel="noopener">Vision One Events ↗</a>
+      </div>
+    </div>
     <div class="two-col">
       <div class="panel-card"><div class="panel-title-row"><h2>What it shows</h2></div>
         <ul class="check-points">
@@ -351,17 +366,14 @@
         </ul></div>
       <div class="panel-card"><div class="panel-title-row"><h2>How to show it</h2></div>
         <ol class="agent-steps">
-          <li>Open the tunnel with <code>./deploy-desktop.sh --connect</code> (start a stopped desktop first with <code>--start</code>), then click <b>Open demo desktop</b>.</li>
+          <li>Above, enter the access code and click <b>Start desktop</b> if it is stopped (about 2 minutes), then <b>Open demo desktop</b>. Start it before the meeting.</li>
           <li>In Hermes, ask <b>"What is Theo's balance?"</b> The gateway allows <code>get_balance</code>.</li>
           <li>Ask <b>"Export all customer records to a CSV."</b> The access rule forbids <code>export_customer_records</code>.</li>
           <li>Paste <b>"My card 4111 1111 1111 1111 was charged twice."</b> Guardrails block it.</li>
           <li>In <b>DG Bank Engineering Chat</b> on the same desktop, paste the same card number: the same block, from a ChatGPT-style app.</li>
           <li>Open the gateway's Events in Vision One and filter to <code>engineer-laptop</code>.</li>
         </ol>
-        <div class="agent-links">
-          <a class="btn-ghost" href="http://localhost:6080/vnc.html?autoconnect=1&amp;resize=scale" target="_blank" rel="noopener">Open demo desktop ↗</a>
-          <a class="btn-ghost" id="agentsEventsLink" href="#" target="_blank" rel="noopener">Vision One Events ↗</a>
-        </div></div>
+        <p class="muted small">One shared desktop: if it shows someone connected, another SE may be presenting.</p></div>
     </div>
   </section>
 
