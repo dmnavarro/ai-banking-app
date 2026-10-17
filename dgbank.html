@@ -621,7 +621,27 @@
 <!-- ── FULL-SCREEN DEMO VIEW (chat window is moved in here by toggleDemoView) ── -->
 <div class="demo-view" id="demoView" hidden>
   <div class="demo-bar" id="demoBar">
-    <div class="demo-brand">DG Bank <span>· AI security demo</span></div>
+    <a href="#home" class="demo-brand logo" title="Back to the homepage" onclick="toggleDemoView(false);showView('home');return false;">
+      <div class="logo-mark" style="background:none;padding:0;overflow:hidden;">
+      <svg width="30" height="30" viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="blazeGradDemo" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#dd1500" />
+            <stop offset="100%" stop-color="#ff8c00" />
+          </linearGradient>
+          <clipPath id="badgeClipDemo">
+            <rect x="0" y="0" width="160" height="160" rx="28" />
+          </clipPath>
+        </defs>
+        <rect x="0" y="0" width="160" height="160" rx="28" fill="url(#blazeGradDemo)" />
+        <path d="M 80 14 L 90 80 L 80 146 L 70 80 Z" fill="white" clip-path="url(#badgeClipDemo)" />
+        <path d="M 14 80 L 80 70 L 146 80 L 80 90 Z" fill="white" opacity="0.90" clip-path="url(#badgeClipDemo)" />
+        <circle cx="80" cy="80" r="10" fill="url(#blazeGradDemo)" clip-path="url(#badgeClipDemo)" />
+      </svg>
+    </div>
+    <div><div class="logo-word">DG<span> Bank</span></div></div>
+      <span class="demo-sub">· AI security demo</span>
+    </a>
     <div class="demo-scenarios" role="group" aria-label="Test scenarios">
       <button class="demo-scn" data-scenario="1" onclick="applyScenario(1)"><b>Test 1</b> No protection</button>
       <button class="demo-scn" data-scenario="2" onclick="applyScenario(2)"><b>Test 2</b> App-side Guard</button>

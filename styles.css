@@ -1431,7 +1431,10 @@ body.demo-mode .chat-bubble { display: none; }
   padding: .7rem 1.25rem; background: var(--navy); color: #fff;
 }
 .demo-brand { font-weight: 800; font-size: 1rem; letter-spacing: -.2px; white-space: nowrap; }
-.demo-brand span { font-weight: 500; color: rgba(255,255,255,.55); }
+.demo-brand { gap: 8px; }
+.demo-brand .logo-word { color: #fff; font-size: 1.15rem; }
+.demo-brand .logo-word span { color: #FF6B7D; }
+.demo-brand .demo-sub { font-weight: 500; color: rgba(255,255,255,.55); }
 .demo-scenarios { display: flex; gap: .4rem; flex-wrap: wrap; flex: 1; justify-content: center; }
 .demo-scn {
   display: flex; flex-direction: column; align-items: flex-start; gap: .05rem;
