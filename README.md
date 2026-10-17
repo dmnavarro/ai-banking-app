@@ -520,6 +520,8 @@ This passes the desktop and the access code to the app, lets the app start that 
 
 **Admin commands:** `./deploy-desktop.sh --show-code` prints the code; `--rotate-code` makes a new one (then run `./deploy-ecs.sh` so the app picks it up; everyone has to enter the new code). After rotating the gateway key, update its SSM parameter and run `--setup`. `--start` / `--stop` work from the CLI too, `--connect` is an SSM tunnel for admins (needs the [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html)), and `--delete` removes the desktop.
 
+> **Hermes and Groq's free tier.** Hermes sends about 12,000 tokens with every request (its built-in tools and skills), more than a free Groq organization allows per minute (8,000), so through `dgbank-chat` it fails with *413 Request too large*. Give Hermes its own model name routed to Bedrock: in **Controls → Routing Rules** add `dgbank-agent` (requested model `dgbank-agent`, alias `deepseek`, fallback `openai`), then `./deploy-desktop.sh --setup --hermes-model dgbank-agent`. The setup's last lines test both model names.
+
 > **To verify on the first run.** Hermes's config file format (`~/.hermes/config.yaml`: `model.provider: custom`, `base_url`, `api_key`, `default`; `mcp_servers.dgbank.url` + `headers`) was taken from its documentation, not tested here. If Hermes asks for a provider on first start, run `hermes model` on the desktop and choose the custom endpoint. If Open WebUI shows no models, add `dgbank-chat` under **Admin → Settings → Connections**.
 
 ### Gateway pods and memory
@@ -812,6 +814,7 @@ Events appear in **Vision One → Network Security → Cloud IPS** within second
 | `--instance-type` | `t3.large` | `t3.large`, `t3.xlarge` or `m7i.large` |
 | `--gateway-url` / `--gateway-mcp-url` | from the ECS stack | Override the gateway endpoints |
 | `--v1-region` | `sg` | Vision One portal region for the Events shortcut |
+| `--hermes-model` | `dgbank-chat` | Model name Hermes requests; use one routed to Bedrock (e.g. `dgbank-agent`) when Groq's free tier rejects Hermes's large requests |
 
 ---
 

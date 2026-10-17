@@ -31,6 +31,7 @@ REGION="ap-southeast-1"
 INSTANCE_TYPE="t3.large"
 GW_URL=""                             # empty = the ECS stack's GatewayBaseUrl
 GW_MCP_URL=""                         # empty = the ECS stack's GatewayMcpUrl
+HERMES_MODEL="dgbank-chat"            # model name Hermes asks the gateway for
 V1_REGION="sg"
 LOCAL_PORT="6080"
 MODE="deploy"
@@ -56,6 +57,8 @@ Optional:
   --gateway-url        AI Gateway LLM endpoint (default: from the ECS stack)
   --gateway-mcp-url    AI Gateway MCP Connect URL (default: from the ECS stack)
   --v1-region          Vision One portal region for the bookmark: sg, us, eu, jp, au, in (default: sg)
+  --hermes-model       Model name Hermes requests (default: dgbank-chat). Use one whose routing rule
+                       sends it to Bedrock, e.g. dgbank-agent: Hermes requests exceed Groq's free tier
   --local-port         Local port for --connect (default: 6080)
   --help               Show this help
 EOF
@@ -77,6 +80,7 @@ while [[ $# -gt 0 ]]; do
     --instance-type)   INSTANCE_TYPE="$2";        shift 2 ;;
     --gateway-url)     GW_URL="$2";               shift 2 ;;
     --gateway-mcp-url) GW_MCP_URL="$2";           shift 2 ;;
+    --hermes-model)    HERMES_MODEL="$2";         shift 2 ;;
     --v1-region)       V1_REGION="$2";            shift 2 ;;
     --local-port)      LOCAL_PORT="$2";           shift 2 ;;
     --help)            usage ;;
@@ -133,6 +137,7 @@ run_setup() {
 
   echo "Gateway     : $GW_URL"
   echo "MCP         : ${GW_MCP_URL:-(none: Hermes gets no banking tools)}"
+  echo "Hermes model: $HERMES_MODEL"
   echo ""
   echo "Installing the desktop software with SSM Run Command (10–15 minutes the first time)..."
 
@@ -140,11 +145,11 @@ run_setup() {
   local b64
   b64=$(base64 < "$SETUP_SCRIPT" | tr -d '\n')
   local params
-  params=$(jq -n --arg b64 "$b64" --arg gw "$GW_URL" --arg mcp "$GW_MCP_URL" --arg region "$REGION" --arg ev "$v1_events" '{
+  params=$(jq -n --arg b64 "$b64" --arg gw "$GW_URL" --arg mcp "$GW_MCP_URL" --arg region "$REGION" --arg ev "$v1_events" --arg hm "$HERMES_MODEL" '{
     executionTimeout: ["3600"],
     commands: [
       "echo \($b64) | base64 -d > /root/dgbank-desktop-setup.sh",
-      "GW_URL=\($gw | @sh) GW_MCP_URL=\($mcp | @sh) REGION=\($region | @sh) V1_EVENTS=\($ev | @sh) bash /root/dgbank-desktop-setup.sh"
+      "GW_URL=\($gw | @sh) GW_MCP_URL=\($mcp | @sh) REGION=\($region | @sh) V1_EVENTS=\($ev | @sh) HERMES_MODEL=\($hm | @sh) bash /root/dgbank-desktop-setup.sh"
     ]}')
   local cmd_id
   cmd_id=$(aws ssm send-command --region "$REGION" --instance-ids "$id" \

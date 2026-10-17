@@ -6,12 +6,16 @@
 #                       GW_MCP_URL  AI Gateway MCP Connect URL for dgbank-mcp (optional)
 #                       REGION      AWS region of the SSM parameter /dgbank/gateway-key-laptop
 #                       V1_EVENTS   Vision One gateway Events URL (browser bookmark)
+#                       HERMES_MODEL  model Hermes asks the gateway for (default dgbank-chat). Hermes sends
+#                                     ~12k tokens per request (its tools and skills), more than Groq's free
+#                                     tier allows per minute, so it can use its own routing rule
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 DEMO_USER=demo
 DEMO_HOME=/home/$DEMO_USER
 MODEL=dgbank-chat
+HERMES_MODEL=${HERMES_MODEL:-$MODEL}
 OPENWEBUI_IMAGE=${OPENWEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main}
 
 : "${GW_URL:?GW_URL is required}"
@@ -118,7 +122,7 @@ install -d -o "$DEMO_USER" -g "$DEMO_USER" "$DEMO_HOME/.hermes"
   echo "  provider: custom"
   echo "  base_url: $GW_URL/v1"
   echo "  api_key: $KEY"
-  echo "  default: $MODEL"
+  echo "  default: $HERMES_MODEL"
   if [[ -n "${GW_MCP_URL:-}" ]]; then
     echo "mcp_servers:"
     echo "  dgbank:"
@@ -194,9 +198,11 @@ systemctl restart demo-vnc.service demo-novnc.service
 systemctl enable --now demo-idle-stop.timer
 
 # ── Self-check: the gateway answers with the engineer-laptop key ─────────────
-log "Checking the gateway as engineer-laptop..."
-curl -sS -m 30 "$GW_URL/v1/chat/completions" -H "Authorization: Bearer $KEY" \
-  -H 'Content-Type: application/json' -H 'Accept-Encoding: identity' \
-  -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with the single word OK.\"}]}" \
-  | jq -r '.choices[0].message.content // .error.message // .' | head -c 300; echo
+for m in $(printf '%s\n' "$MODEL" "$HERMES_MODEL" | sort -u); do
+  log "Checking the gateway as engineer-laptop, model $m..."
+  curl -sS -m 30 "$GW_URL/v1/chat/completions" -H "Authorization: Bearer $KEY" \
+    -H 'Content-Type: application/json' -H 'Accept-Encoding: identity' \
+    -d "{\"model\":\"$m\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with the single word OK.\"}]}" \
+    | jq -r '"\(.model // "-"): \(.choices[0].message.content // .error.message // .)"' | head -c 300; echo
+done
 log "Done."
