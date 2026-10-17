@@ -39,6 +39,9 @@ const MCP_DIRECT_URL  = (process.env.MCP_DIRECT_URL || '').trim();
 const MCP_TOKEN       = (process.env.MCP_TOKEN || '').trim();
 const GATEWAY_MCP_URL = (process.env.GATEWAY_MCP_URL || '').trim();
 const MAX_TOOL_ROUNDS = 5;
+// Earlier turns sent with each message. Every route gets the same window; through the gateway
+// each model call is scanned in full, so an unbounded history makes long demos slower.
+const MAX_HISTORY = 6;
 
 const bedrockClient  = new BedrockRuntimeClient({ region: BEDROCK_REGION });
 const s3Client       = new S3Client({ region: S3_REGION });
@@ -349,9 +352,10 @@ app.post('/api/chat', async (req, res) => {
     { role: 'assistant', content: 'Got it — I have the customer\'s current account data for this session.' },
   ] : [];
 
+  const recent = history.slice(-MAX_HISTORY).map(m => ({ role: m.role, content: m.content }));
   const turns = [
     ...accountContextTurns,
-    ...history.map(m => ({ role: m.role, content: m.content })),
+    ...recent,
     ...reinforcement,
     { role: 'user', content: message },
   ];
@@ -374,7 +378,7 @@ app.post('/api/chat', async (req, res) => {
     }
     const agentMessages = [
       { role: 'system', content: TOOL_PROMPT },
-      ...history.map(m => ({ role: m.role, content: m.content })),
+      ...recent,
       { role: 'user', content: message },
     ];
     try {

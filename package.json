@@ -4,7 +4,8 @@
   "description": "Trend Bank demo with Vision One AI Guard integration",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "latency": "node scripts/latency-check.js"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.600.0",
