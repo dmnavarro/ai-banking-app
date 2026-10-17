@@ -512,7 +512,7 @@ async function callAIGuard(prompt) {
 
     if (!resp.ok) {
       console.warn('[AI Guard] API error', resp.status, '— falling back to demo');
-      return demoFallback(prompt);
+      return { ...demoFallback(prompt), apiStatus: resp.status };
     }
 
     const blocked = data.action === 'Block';
@@ -924,8 +924,12 @@ function traceTools(toolTrace, viaGateway) {
   }
 }
 
-function guardSourceNote(source) {
-  return { live: 'Vision One AI Guard · live', demo: 'Demo mode · pattern match', fallback: 'API unreachable · pattern match fallback' }[source] || '';
+function guardSourceNote(source, apiStatus) {
+  if (source === 'fallback') {
+    return apiStatus ? `AI Guard API returned ${apiStatus} · pattern match fallback`
+                     : 'AI Guard API unreachable · pattern match fallback';
+  }
+  return { live: 'Vision One AI Guard · live', demo: 'Demo mode · pattern match' }[source] || '';
 }
 
 // App-side Guard also scans the model's reply, so the check covers both directions.
@@ -976,7 +980,7 @@ async function sendMessage() {
     if (hasGuard) {
       traceStep('guard', guardResult.blocked ? 'block' : 'ok',
         guardResult.blocked ? 'Prompt blocked' : 'Prompt cleared',
-        guardResult.blocked ? (guardResult.reasons || []).join(', ') || 'Policy violation' : guardSourceNote(guardResult.source),
+        guardResult.blocked ? (guardResult.reasons || []).join(', ') || 'Policy violation' : guardSourceNote(guardResult.source, guardResult.apiStatus),
         performance.now() - t0);
     }
 
